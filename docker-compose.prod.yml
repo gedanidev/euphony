@@ -21,6 +21,10 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://euphony:${DB_PASSWORD:-euphony}@db:5432/euphony
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-https://tu-dominio.com/api/auth/spotify/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-https://tu-dominio.com}
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
     depends_on:
       db:

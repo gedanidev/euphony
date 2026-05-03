@@ -19,6 +19,10 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://euphony:euphony@db:5432/euphony
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:8000/api/auth/spotify/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     volumes:
       - ./backend:/app
     ports:
