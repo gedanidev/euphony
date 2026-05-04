@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { getPlaylists, createPlaylist, deletePlaylist } from '../api/playlists'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -74,6 +75,7 @@ export default function Playlists() {
   const [search, setSearch]       = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const load = async () => {
     try {
@@ -100,7 +102,7 @@ export default function Playlists() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Playlists</h1>
+        <h1 className="text-2xl font-bold">{t('playlists.title')}</h1>
         <button
           onClick={() => setShowCreate(true)}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -108,13 +110,13 @@ export default function Playlists() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New Playlist
+          {t('playlists.new')}
         </button>
       </div>
 
       <input
         type="text"
-        placeholder="Search playlists…"
+        placeholder={t('playlists.search')}
         value={search}
         onChange={e => setSearch(e.target.value)}
         className="w-full max-w-sm mb-6 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
@@ -125,11 +127,11 @@ export default function Playlists() {
 
       {!loading && !error && playlists.length === 0 && (
         <EmptyState
-          title="No playlists yet"
-          description="Create your first playlist to get started"
+          title={t('playlists.empty.title')}
+          description={t('playlists.empty.desc')}
           action={
             <button onClick={() => setShowCreate(true)} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
-              Create Playlist
+              {t('playlists.new')}
             </button>
           }
         />
@@ -150,7 +152,7 @@ export default function Playlists() {
                 </svg>
               </div>
               <p className="font-medium text-sm truncate">{pl.name}</p>
-              <p className="text-[#94a3b8] text-xs mt-0.5">{pl.song_count} {pl.song_count === 1 ? 'song' : 'songs'}</p>
+              <p className="text-[#94a3b8] text-xs mt-0.5">{pl.song_count} {t('common.songs')}</p>
               {pl.description && <p className="text-[#94a3b8] text-xs mt-1 truncate">{pl.description}</p>}
               <button
                 onClick={e => handleDelete(e, pl.id)}
