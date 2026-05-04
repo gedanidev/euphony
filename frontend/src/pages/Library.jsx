@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getSongs, createSong, updateSong, deleteSong, enrichSong } from '../api/songs'
 import { getArtists, createArtist } from '../api/artists'
 import { getAlbums } from '../api/albums'
@@ -296,14 +297,16 @@ function AddToPlaylistModal({ songId, onClose }) {
   )
 }
 
-const AVAILABILITY_TABS = [
-  { key: '', label: 'Todos' },
-  { key: 'available', label: 'Disponibles' },
-  { key: 'wishlist', label: 'Wishlist' },
-  { key: 'not_available', label: 'No disponibles' },
-]
-
 export default function Library() {
+  const { t } = useTranslation()
+
+  const AVAILABILITY_TABS = [
+    { key: '', label: t('library.availability.all') },
+    { key: 'available', label: t('library.availability.available') },
+    { key: 'wishlist', label: t('library.availability.wishlist') },
+    { key: 'not_available', label: t('library.availability.not_available') },
+  ]
+
   const [songs, setSongs] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -362,7 +365,7 @@ export default function Library() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Biblioteca</h1>
+        <h1 className="text-2xl font-bold">{t('library.title')}</h1>
         <button
           onClick={() => setSongModal({ mode: 'create' })}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -370,7 +373,7 @@ export default function Library() {
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Agregar Canción
+          {t('library.addSong')}
         </button>
       </div>
 
@@ -390,7 +393,7 @@ export default function Library() {
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <input
           type="text"
-          placeholder="Buscar por título…"
+          placeholder={t('library.search')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
@@ -405,7 +408,7 @@ export default function Library() {
           <option value="">Todos los moods</option>
           {moods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
-        {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} canciones</span>}
+        {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} {t('library.songs')}</span>}
       </div>
 
       {loading && <LoadingSpinner />}
@@ -413,12 +416,12 @@ export default function Library() {
 
       {!loading && !error && songs.length === 0 && (
         <EmptyState
-          title="No hay canciones"
-          description={availability ? 'No hay canciones con este filtro' : 'Agrega tu primera canción a la biblioteca'}
+          title={t('library.empty.title')}
+          description={availability ? t('library.empty.filtered') : t('library.empty.desc')}
           action={!availability ? (
             <button onClick={() => setSongModal({ mode: 'create' })}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
-              Agregar Canción
+              {t('library.addSong')}
             </button>
           ) : null}
         />
@@ -430,12 +433,12 @@ export default function Library() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#2e2e4a] text-[#94a3b8] text-xs uppercase tracking-wider">
-                  <th className="px-4 py-3">Título</th>
-                  <th className="px-4 py-3">Artista</th>
-                  <th className="px-4 py-3">Álbum</th>
-                  <th className="px-4 py-3">Año</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 text-right">Duración</th>
+                  <th className="px-4 py-3">{t('library.col.title')}</th>
+                  <th className="px-4 py-3">{t('library.col.artist')}</th>
+                  <th className="px-4 py-3">{t('library.col.album')}</th>
+                  <th className="px-4 py-3">{t('library.col.year')}</th>
+                  <th className="px-4 py-3">{t('library.col.status')}</th>
+                  <th className="px-4 py-3 text-right">{t('library.col.duration')}</th>
                   <th className="px-4 py-3 w-40" />
                 </tr>
               </thead>
@@ -486,12 +489,12 @@ export default function Library() {
             <div className="flex items-center justify-center gap-3 mt-5">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white disabled:cursor-not-allowed transition-colors">
-                ← Anterior
+                {t('common.prev')}
               </button>
               <span className="text-[#94a3b8] text-sm">{page} / {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                 className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white disabled:cursor-not-allowed transition-colors">
-                Siguiente →
+                {t('common.next')}
               </button>
             </div>
           )}
