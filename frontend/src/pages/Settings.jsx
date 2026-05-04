@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n/index.js'
 import { getSpotifyLoginUrl, getSpotifyStatus, syncSpotify } from '../api/auth'
 
 export default function Settings() {
+  const { t } = useTranslation()
+
+  const handleLanguageChange = (e) => {
+    const lang = e.target.value
+    i18n.changeLanguage(lang)
+    localStorage.setItem('euphony-language', lang)
+  }
+
   const [spotifyConn, setSpotifyConn] = useState(null)
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -60,7 +70,28 @@ export default function Settings() {
 
   return (
     <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-8">Configuración</h1>
+      <h1 className="text-2xl font-bold mb-8">{t('settings.title')}</h1>
+
+      {/* Language selector */}
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+            <span className="text-purple-400 text-lg">🌐</span>
+          </div>
+          <div>
+            <h2 className="font-semibold">{t('settings.language')}</h2>
+          </div>
+        </div>
+        <select
+          value={i18n.language}
+          onChange={handleLanguageChange}
+          className="px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500"
+        >
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
 
       {/* Spotify */}
       <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 mb-6">
