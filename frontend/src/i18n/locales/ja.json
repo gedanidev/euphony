@@ -5,6 +5,9 @@
   "nav.import": "インポート",
   "nav.settings": "設定",
   "nav.tools": "ツール",
+  "nav.albums": "アルバム",
+  "nav.genres": "ジャンル",
+  "nav.moods": "ムード",
 
   "library.title": "ライブラリ",
   "library.addSong": "曲を追加",
@@ -30,6 +33,24 @@
   "artists.empty.title": "アーティストがいません",
   "artists.empty.desc": "最初のアーティストを作成するか、M3U8をインポートしてください",
   "artists.count": "アーティスト",
+
+  "albums.title": "アルバム",
+  "albums.new": "新規アルバム",
+  "albums.search": "アルバムを検索…",
+  "albums.empty.title": "アルバムがありません",
+  "albums.empty.desc": "最初のアルバムを作成してください",
+  "albums.count": "アルバム",
+
+  "genres.title": "ジャンル",
+  "genres.add": "追加",
+  "genres.placeholder": "ジャンル名…",
+  "genres.empty": "ジャンルがありません。最初に追加してください。",
+
+  "moods.title": "ムード",
+  "moods.add": "追加",
+  "moods.placeholder": "ムード名…",
+  "moods.descPlaceholder": "説明（任意）…",
+  "moods.empty": "ムードがありません。最初に追加してください。",
 
   "playlists.title": "プレイリスト",
   "playlists.new": "新規プレイリスト",

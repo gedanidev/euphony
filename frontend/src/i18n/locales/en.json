@@ -5,6 +5,9 @@
   "nav.import": "Import",
   "nav.settings": "Settings",
   "nav.tools": "Tools",
+  "nav.albums": "Albums",
+  "nav.genres": "Genres",
+  "nav.moods": "Moods",
 
   "library.title": "Library",
   "library.addSong": "Add Song",
@@ -30,6 +33,24 @@
   "artists.empty.title": "No artists yet",
   "artists.empty.desc": "Create your first artist or import an M3U8 playlist",
   "artists.count": "artists",
+
+  "albums.title": "Albums",
+  "albums.new": "New Album",
+  "albums.search": "Search albums…",
+  "albums.empty.title": "No albums yet",
+  "albums.empty.desc": "Create your first album",
+  "albums.count": "albums",
+
+  "genres.title": "Genres",
+  "genres.add": "Add",
+  "genres.placeholder": "Genre name…",
+  "genres.empty": "No genres yet. Add the first one.",
+
+  "moods.title": "Moods",
+  "moods.add": "Add",
+  "moods.placeholder": "Mood name…",
+  "moods.descPlaceholder": "Optional description…",
+  "moods.empty": "No moods yet. Add the first one.",
 
   "playlists.title": "Playlists",
   "playlists.new": "New Playlist",
