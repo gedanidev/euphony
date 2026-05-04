@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { importM3U8 } from '../api/import'
 
 export default function Import() {
@@ -9,6 +10,7 @@ export default function Import() {
   const [error, setError] = useState(null)
   const [showFailed, setShowFailed] = useState(false)
   const inputRef = useRef(null)
+  const { t } = useTranslation()
 
   const handleDrop = (e) => {
     e.preventDefault()
@@ -31,9 +33,9 @@ export default function Import() {
 
   return (
     <div className="p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-2">Importar Playlist</h1>
+      <h1 className="text-2xl font-bold mb-2">{t('import.title')}</h1>
       <p className="text-[#94a3b8] text-sm mb-8">
-        Sube un archivo M3U/M3U8 para importar canciones a tu biblioteca. Se crearán automáticamente artistas y canciones nuevas. Las existentes quedarán vinculadas.
+        {t('import.desc')}
       </p>
 
       {/* Drop zone */}
@@ -56,7 +58,7 @@ export default function Import() {
               </svg>
             </div>
             <p className="font-medium text-[#e2e8f0]">{file.name}</p>
-            <p className="text-xs text-[#94a3b8] mt-1">{(file.size / 1024).toFixed(1)} KB — haz clic para cambiar</p>
+            <p className="text-xs text-[#94a3b8] mt-1">{(file.size / 1024).toFixed(1)} KB — {t('import.dropSub')}</p>
           </div>
         ) : (
           <div>
@@ -66,8 +68,8 @@ export default function Import() {
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <p className="font-medium text-[#e2e8f0]">Arrastra tu archivo M3U/M3U8 aquí</p>
-            <p className="text-xs text-[#94a3b8] mt-1">o haz clic para seleccionar</p>
+            <p className="font-medium text-[#e2e8f0]">{t('import.drop')}</p>
+            <p className="text-xs text-[#94a3b8] mt-1">{t('import.dropSub')}</p>
           </div>
         )}
       </div>
@@ -75,7 +77,7 @@ export default function Import() {
       {file && (
         <button onClick={handleImport} disabled={loading}
           className="mt-4 w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-medium transition-colors">
-          {loading ? 'Importando…' : 'Importar Playlist'}
+          {loading ? t('import.importing') : t('import.button')}
         </button>
       )}
 
@@ -87,19 +89,19 @@ export default function Import() {
 
       {result && (
         <div className="mt-6 bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6">
-          <h2 className="font-semibold mb-4">Resultado de importación</h2>
+          <h2 className="font-semibold mb-4">{t('import.result.title')}</h2>
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="text-center">
               <p className="text-3xl font-bold text-green-400">{result.created}</p>
-              <p className="text-xs text-[#94a3b8] mt-1">Canciones creadas</p>
+              <p className="text-xs text-[#94a3b8] mt-1">{t('import.result.created')}</p>
             </div>
             <div className="text-center">
               <p className="text-3xl font-bold text-blue-400">{result.matched}</p>
-              <p className="text-xs text-[#94a3b8] mt-1">Ya existían</p>
+              <p className="text-xs text-[#94a3b8] mt-1">{t('import.result.matched')}</p>
             </div>
             <div className="text-center">
               <p className={`text-3xl font-bold ${result.failed > 0 ? 'text-red-400' : 'text-[#94a3b8]'}`}>{result.failed}</p>
-              <p className="text-xs text-[#94a3b8] mt-1">Fallidas</p>
+              <p className="text-xs text-[#94a3b8] mt-1">{t('import.result.failed')}</p>
             </div>
           </div>
 
@@ -121,14 +123,14 @@ export default function Import() {
 
           <button onClick={() => setResult(null)}
             className="mt-4 px-4 py-2 bg-[#22223a] hover:bg-[#2e2e4a] text-white rounded-lg text-sm transition-colors">
-            Importar otra playlist
+            {t('import.another')}
           </button>
         </div>
       )}
 
       {/* Format reference */}
       <div className="mt-8 bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-4">
-        <p className="text-xs text-[#94a3b8] font-semibold uppercase tracking-wider mb-2">Formato esperado</p>
+        <p className="text-xs text-[#94a3b8] font-semibold uppercase tracking-wider mb-2">{t('import.format')}</p>
         <pre className="text-xs text-[#64748b] font-mono leading-relaxed">{`#EXTM3U
 #EXTINF:245,Lady Gaga - Die with a Smile
 /Walkman/Music/lady_gaga_die_with_a_smile.mp3
