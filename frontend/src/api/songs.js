@@ -8,6 +8,11 @@ export const deleteSong  = (id)     => api.delete(`/songs/${id}`)
 export const enrichSong  = (id)     => api.post(`/songs/${id}/enrich`).then(r => r.data)
 export const getSongCovers = (id)   => api.get(`/songs/${id}/covers`).then(r => r.data)
 
+// Batch
+export const batchDelete       = (song_ids)              => api.post('/songs/batch/delete', { song_ids })
+export const batchAvailability = (song_ids, availability) => api.post('/songs/batch/availability', { song_ids, availability })
+export const batchDeleteAll    = ()                       => api.post('/songs/batch/delete-all', { confirm: 'DELETE_ALL' })
+
 // Lyrics
 export const getLyrics      = (id)         => api.get(`/songs/${id}/lyrics`).then(r => r.data)
 export const saveLyrics     = (id, data)   => api.patch(`/songs/${id}/lyrics`, data)

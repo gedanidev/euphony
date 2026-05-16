@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getSongs, createSong, updateSong, deleteSong, enrichSong } from '../api/songs'
+import { getSongs, createSong, updateSong, deleteSong, enrichSong, batchDelete, batchAvailability, batchDeleteAll } from '../api/songs'
 import { getArtists, createArtist } from '../api/artists'
 import { getAlbums } from '../api/albums'
 import { getGenres } from '../api/genres'
@@ -325,6 +325,9 @@ export default function Library() {
   const [addToPlaylist, setAddToPlaylist] = useState(null)
   const [enriching, setEnriching] = useState(null)
   const [lyricsModal, setLyricsModal] = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
 
   useEffect(() => {
     getGenres().then(setGenres).catch(() => {})
@@ -362,21 +365,71 @@ export default function Library() {
     finally { setEnriching(null) }
   }
 
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => setSelected(new Set(songs.map(s => s.id)))
+  const clearSelection = () => setSelected(new Set())
+
+  const handleBatchAvailability = async (availability) => {
+    if (selected.size === 0) return
+    setBatchLoading(true)
+    try {
+      await batchAvailability([...selected], availability)
+      setSelected(new Set())
+      load()
+    } finally { setBatchLoading(false) }
+  }
+
+  const handleBatchDelete = async () => {
+    if (selected.size === 0) return
+    if (!confirm(t('library.batch.deleteConfirm', { n: selected.size }))) return
+    setBatchLoading(true)
+    try {
+      await batchDelete([...selected])
+      setSelected(new Set())
+      load()
+    } finally { setBatchLoading(false) }
+  }
+
+  const handleDeleteAll = async () => {
+    setBatchLoading(true)
+    try {
+      await batchDeleteAll()
+      setShowDeleteAllConfirm(false)
+      setSelected(new Set())
+      load()
+    } finally { setBatchLoading(false) }
+  }
+
   const totalPages = Math.ceil(total / limit)
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">{t('library.title')}</h1>
-        <button
-          onClick={() => setSongModal({ mode: 'create' })}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {t('library.addSong')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowDeleteAllConfirm(true)}
+            className="px-3 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-lg text-sm transition-colors"
+          >
+            {t('library.batch.deleteAll')}
+          </button>
+          <button
+            onClick={() => setSongModal({ mode: 'create' })}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            {t('library.addSong')}
+          </button>
+        </div>
       </div>
 
       {/* Availability tabs */}
@@ -413,6 +466,35 @@ export default function Library() {
         {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} {t('library.songs')}</span>}
       </div>
 
+      {/* Batch action bar */}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 px-4 py-3 bg-purple-900/20 border border-purple-700/40 rounded-xl">
+          <span className="text-sm text-purple-300 font-medium mr-1">
+            {t('library.batch.selected', { n: selected.size })}
+          </span>
+          <button onClick={() => handleBatchAvailability('available')} disabled={batchLoading}
+            className="px-3 py-1.5 bg-green-700/20 hover:bg-green-700/40 text-green-400 text-xs rounded-lg transition-colors disabled:opacity-50">
+            {t('library.batch.markAvailable')}
+          </button>
+          <button onClick={() => handleBatchAvailability('wishlist')} disabled={batchLoading}
+            className="px-3 py-1.5 bg-yellow-700/20 hover:bg-yellow-700/40 text-yellow-400 text-xs rounded-lg transition-colors disabled:opacity-50">
+            {t('library.batch.markWishlist')}
+          </button>
+          <button onClick={() => handleBatchAvailability('not_available')} disabled={batchLoading}
+            className="px-3 py-1.5 bg-[#22223a] hover:bg-[#2e2e4a] text-[#94a3b8] text-xs rounded-lg transition-colors disabled:opacity-50">
+            {t('library.batch.markNotAvailable')}
+          </button>
+          <button onClick={handleBatchDelete} disabled={batchLoading}
+            className="px-3 py-1.5 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs rounded-lg transition-colors disabled:opacity-50">
+            {t('library.batch.delete')}
+          </button>
+          <button onClick={clearSelection}
+            className="ml-auto text-xs text-[#94a3b8] hover:text-white transition-colors">
+            {t('library.batch.clearAll')}
+          </button>
+        </div>
+      )}
+
       {loading && <LoadingSpinner />}
       {error && <ErrorState message={error} onRetry={load} />}
 
@@ -435,6 +517,13 @@ export default function Library() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-[#2e2e4a] text-[#94a3b8] text-xs uppercase tracking-wider">
+                  <th className="px-3 py-3 w-8">
+                    <input type="checkbox"
+                      className="rounded border-[#2e2e4a] bg-[#0f0f13] accent-purple-600 cursor-pointer"
+                      checked={songs.length > 0 && songs.every(s => selected.has(s.id))}
+                      onChange={e => e.target.checked ? selectAll() : clearSelection()}
+                    />
+                  </th>
                   <th className="px-4 py-3">{t('library.col.title')}</th>
                   <th className="px-4 py-3">{t('library.col.artist')}</th>
                   <th className="px-4 py-3">{t('library.col.album')}</th>
@@ -446,7 +535,14 @@ export default function Library() {
               </thead>
               <tbody>
                 {songs.map(song => (
-                  <tr key={song.id} className="border-b border-[#2e2e4a] hover:bg-[#22223a]/40 group text-sm">
+                  <tr key={song.id} className={`border-b border-[#2e2e4a] hover:bg-[#22223a]/40 group text-sm ${selected.has(song.id) ? 'bg-purple-900/10' : ''}`}>
+                    <td className="px-3 py-2">
+                      <input type="checkbox"
+                        className="rounded border-[#2e2e4a] bg-[#0f0f13] accent-purple-600 cursor-pointer"
+                        checked={selected.has(song.id)}
+                        onChange={() => toggleSelect(song.id)}
+                      />
+                    </td>
                     <td className="px-4 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
                     <td className="px-4 py-2 text-[#94a3b8]">{song.artist_display || '—'}</td>
                     <td className="px-4 py-2 text-[#94a3b8]">{song.album?.title || '—'}</td>
@@ -522,6 +618,32 @@ export default function Library() {
 
       {lyricsModal && (
         <LyricsModal song={lyricsModal} onClose={() => setLyricsModal(null)} />
+      )}
+
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setShowDeleteAllConfirm(false)}>
+          <div className="bg-[#1a1a24] border border-red-900/50 rounded-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <h2 className="font-semibold text-red-400">{t('library.batch.deleteAll')}</h2>
+            </div>
+            <p className="text-sm text-[#94a3b8] mb-6">{t('library.batch.deleteAllConfirm')}</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowDeleteAllConfirm(false)}
+                className="px-4 py-2 bg-[#22223a] hover:bg-[#2e2e4a] text-[#e2e8f0] text-sm rounded-lg transition-colors">
+                {t('common.cancel')}
+              </button>
+              <button onClick={handleDeleteAll} disabled={batchLoading}
+                className="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">
+                {batchLoading ? '…' : t('library.batch.deleteAllConfirmBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

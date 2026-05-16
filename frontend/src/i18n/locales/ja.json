@@ -73,6 +73,18 @@
   "import.another": "別のプレイリストをインポート",
   "import.format": "期待されるフォーマット",
 
+  "library.batch.selected": "{{n}}曲選択中",
+  "library.batch.selectAll": "すべて選択",
+  "library.batch.clearAll": "選択解除",
+  "library.batch.markAvailable": "利用可能にする",
+  "library.batch.markWishlist": "ウィッシュリストに追加",
+  "library.batch.markNotAvailable": "利用不可にする",
+  "library.batch.delete": "選択を削除",
+  "library.batch.deleteConfirm": "{{n}}曲を削除しますか？この操作は元に戻せません。",
+  "library.batch.deleteAll": "ライブラリを空にする",
+  "library.batch.deleteAllConfirm": "本当によろしいですか？ライブラリのすべての曲が削除されます。この操作は元に戻せません。",
+  "library.batch.deleteAllConfirmBtn": "はい、空にする",
+
   "lyrics.title": "歌詞",
   "lyrics.fetchLrclib": "LRCLIBで検索",
   "lyrics.fetching": "検索中…",

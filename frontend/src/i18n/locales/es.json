@@ -73,6 +73,18 @@
   "import.another": "Importar otra playlist",
   "import.format": "Formato esperado",
 
+  "library.batch.selected": "{{n}} seleccionadas",
+  "library.batch.selectAll": "Seleccionar todo",
+  "library.batch.clearAll": "Limpiar selección",
+  "library.batch.markAvailable": "Marcar disponibles",
+  "library.batch.markWishlist": "Marcar wishlist",
+  "library.batch.markNotAvailable": "Marcar no disponibles",
+  "library.batch.delete": "Eliminar seleccionadas",
+  "library.batch.deleteConfirm": "¿Eliminar {{n}} canciones? Esta acción no se puede deshacer.",
+  "library.batch.deleteAll": "Vaciar biblioteca",
+  "library.batch.deleteAllConfirm": "¿Estás seguro? Esto eliminará TODAS las canciones de la biblioteca. Esta acción es irreversible.",
+  "library.batch.deleteAllConfirmBtn": "Sí, vaciar biblioteca",
+
   "lyrics.title": "Letras",
   "lyrics.fetchLrclib": "Buscar en LRCLIB",
   "lyrics.fetching": "Buscando…",

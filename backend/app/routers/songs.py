@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 from typing import Optional, List
 from uuid import UUID
+from pydantic import BaseModel
 import asyncio
 import httpx
 
@@ -169,6 +170,48 @@ def delete_song(song_id: UUID, db: Session = Depends(get_db)):
     if not song:
         raise HTTPException(404, "Song not found")
     db.delete(song)
+    db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Batch operations
+# ---------------------------------------------------------------------------
+
+class BatchDeleteBody(BaseModel):
+    song_ids: List[UUID]
+
+class BatchAvailabilityBody(BaseModel):
+    song_ids: List[UUID]
+    availability: str
+
+class BatchDeleteAllBody(BaseModel):
+    confirm: str  # must equal "DELETE_ALL"
+
+
+@router.post("/batch/delete", status_code=204)
+def batch_delete(body: BatchDeleteBody, db: Session = Depends(get_db)):
+    """Delete a list of songs by ID."""
+    db.query(models.Song).filter(models.Song.id.in_(body.song_ids)).delete(synchronize_session=False)
+    db.commit()
+
+
+@router.post("/batch/availability", status_code=204)
+def batch_availability(body: BatchAvailabilityBody, db: Session = Depends(get_db)):
+    """Change availability for a list of songs."""
+    if body.availability not in ("available", "wishlist", "not_available"):
+        raise HTTPException(400, "Invalid availability value")
+    db.query(models.Song).filter(models.Song.id.in_(body.song_ids)).update(
+        {"availability": body.availability}, synchronize_session=False
+    )
+    db.commit()
+
+
+@router.post("/batch/delete-all", status_code=204)
+def batch_delete_all(body: BatchDeleteAllBody, db: Session = Depends(get_db)):
+    """Delete ALL songs from the library. Requires confirm='DELETE_ALL'."""
+    if body.confirm != "DELETE_ALL":
+        raise HTTPException(400, "confirm field must be 'DELETE_ALL'")
+    db.query(models.Song).delete(synchronize_session=False)
     db.commit()
 
 
