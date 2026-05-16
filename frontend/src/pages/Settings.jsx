@@ -48,7 +48,7 @@ export default function Settings() {
       const { auth_url } = await getSpotifyLoginUrl()
       window.location.href = auth_url
     } catch (e) {
-      alert(e.response?.data?.detail || 'Error conectando con Spotify. ¿Están configuradas las credenciales en el servidor?')
+      alert(e.response?.data?.detail || t('settings.spotify.connectError'))
       setConnecting(false)
     }
   }
@@ -59,7 +59,7 @@ export default function Settings() {
       const result = await syncSpotify()
       setSyncResult(result)
     } catch (e) {
-      alert(e.response?.data?.detail || 'Error sincronizando')
+      alert(e.response?.data?.detail || t('settings.spotify.syncError'))
     } finally { setSyncing(false) }
   }
 
@@ -103,14 +103,14 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="font-semibold">Spotify</h2>
-            <p className="text-xs text-[#94a3b8]">Importa tu historial de escucha</p>
+            <p className="text-xs text-[#94a3b8]">{t('settings.spotify.desc')}</p>
           </div>
           {!loadingStatus && (
             <div className="ml-auto">
               {spotifyConn ? (
-                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg">Conectado</span>
+                <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg">{t('settings.spotify.connected')}</span>
               ) : (
-                <span className="px-2 py-1 bg-[#22223a] text-[#94a3b8] text-xs rounded-lg">No conectado</span>
+                <span className="px-2 py-1 bg-[#22223a] text-[#94a3b8] text-xs rounded-lg">{t('settings.spotify.notConnected')}</span>
               )}
             </div>
           )}
@@ -121,35 +121,35 @@ export default function Settings() {
         ) : spotifyConn ? (
           <div className="space-y-3">
             {spotifyConn.expires_at && (
-              <p className="text-xs text-[#94a3b8]">Token expira: {formatExpiry(spotifyConn.expires_at)}</p>
+              <p className="text-xs text-[#94a3b8]">{t('settings.spotify.tokenExpires')} {formatExpiry(spotifyConn.expires_at)}</p>
             )}
             <button onClick={handleSync} disabled={syncing}
               className="px-4 py-2 bg-[#1DB954] hover:bg-[#1aa34a] disabled:opacity-50 text-black font-medium rounded-lg text-sm transition-colors">
-              {syncing ? 'Sincronizando…' : '↻ Sincronizar últimas escuchadas'}
+              {syncing ? t('settings.spotify.syncing') : t('settings.spotify.sync')}
             </button>
             {syncResult && (
               <div className="bg-[#0f0f13] rounded-lg p-3 text-sm">
-                <p className="text-green-400">✓ Sincronización completada</p>
+                <p className="text-green-400">{t('settings.spotify.syncDone')}</p>
                 <p className="text-[#94a3b8] text-xs mt-1">
-                  {syncResult.songs_created} canciones creadas · {syncResult.songs_matched} ya existían · {syncResult.history_entries_added} historial
+                  {t('settings.spotify.syncStats', { created: syncResult.songs_created, matched: syncResult.songs_matched, history: syncResult.history_entries_added })}
                 </p>
               </div>
             )}
             <button onClick={handleConnect} className="text-xs text-[#94a3b8] hover:text-white transition-colors">
-              Reconectar cuenta
+              {t('settings.spotify.reconnect')}
             </button>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-[#94a3b8]">
-              Conecta tu cuenta de Spotify para importar automáticamente las últimas 50 canciones escuchadas a tu historial.
+              {t('settings.spotify.connectDesc')}
             </p>
             <button onClick={handleConnect} disabled={connecting}
               className="px-4 py-2 bg-[#1DB954] hover:bg-[#1aa34a] disabled:opacity-50 text-black font-medium rounded-lg text-sm transition-colors">
-              {connecting ? 'Redirigiendo…' : 'Conectar con Spotify'}
+              {connecting ? t('settings.spotify.connecting') : t('settings.spotify.connect')}
             </button>
             <p className="text-xs text-[#94a3b8]">
-              Requiere <code className="bg-[#22223a] px-1 rounded">SPOTIFY_CLIENT_ID</code> y <code className="bg-[#22223a] px-1 rounded">SPOTIFY_CLIENT_SECRET</code> configurados en el servidor.
+              {t('settings.spotify.requiresCredentials')}
             </p>
           </div>
         )}
@@ -163,12 +163,12 @@ export default function Settings() {
           </div>
           <div>
             <h2 className="font-semibold">MusicBrainz / LRCLIB</h2>
-            <p className="text-xs text-[#94a3b8]">Enriquecimiento de metadata</p>
+            <p className="text-xs text-[#94a3b8]">{t('settings.musicbrainz.desc')}</p>
           </div>
-          <span className="ml-auto px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg">Disponible</span>
+          <span className="ml-auto px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-lg">{t('settings.musicbrainz.available')}</span>
         </div>
         <p className="text-sm text-[#94a3b8]">
-          No requiere configuración. Usa el botón <span className="text-blue-400">✦</span> en cada canción o artista para obtener metadata automáticamente desde MusicBrainz y letras sincronizadas desde LRCLIB.
+          {t('settings.musicbrainz.info')}
         </p>
       </div>
     </div>
