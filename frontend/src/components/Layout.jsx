@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '../contexts/AuthContext'
 
 function NavItem({ to, icon, label }) {
   return (
@@ -21,6 +22,13 @@ function NavItem({ to, icon, label }) {
 
 export default function Layout({ children }) {
   const { t } = useTranslation()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout()
+    navigate('/login', { replace: true })
+  }
   return (
     <div className="flex h-screen bg-[#0f0f13] text-[#e2e8f0] overflow-hidden">
       <aside className="w-56 flex-shrink-0 bg-[#1a1a24] border-r border-[#2e2e4a] flex flex-col">
@@ -83,8 +91,14 @@ export default function Layout({ children }) {
             </svg>
           } />
         </nav>
-        <div className="p-4 border-t border-[#2e2e4a]">
+        <div className="p-4 border-t border-[#2e2e4a] space-y-2">
           <p className="text-xs text-[#94a3b8]">Euphony {t('common.version')}</p>
+          <button
+            onClick={handleLogout}
+            className="w-full text-left text-xs text-[#94a3b8] hover:text-red-400 transition-colors"
+          >
+            {t('auth.logout')}
+          </button>
         </div>
       </aside>
 
