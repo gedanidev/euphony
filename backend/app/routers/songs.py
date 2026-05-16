@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 from typing import Optional, List
 from uuid import UUID
+import asyncio
+import httpx
 
 from app.database import get_db
 from app import models, schemas
@@ -167,3 +170,172 @@ def delete_song(song_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(404, "Song not found")
     db.delete(song)
     db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Lyrics endpoints
+# ---------------------------------------------------------------------------
+
+def _get_song_or_404(db: Session, song_id: UUID) -> models.Song:
+    song = db.query(models.Song).filter(models.Song.id == song_id).first()
+    if not song:
+        raise HTTPException(404, "Song not found")
+    return song
+
+
+def _principal_artist(song: models.Song) -> str:
+    for sa in song.song_artists:
+        if sa.role == "principal":
+            return sa.artist.name
+    if song.song_artists:
+        return song.song_artists[0].artist.name
+    return ""
+
+
+@router.get("/{song_id}/lyrics")
+def get_lyrics(song_id: UUID, db: Session = Depends(get_db)):
+    song = (
+        db.query(models.Song)
+        .options(selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist))
+        .filter(models.Song.id == song_id)
+        .first()
+    )
+    if not song:
+        raise HTTPException(404, "Song not found")
+    return {
+        "lyrics": song.lyrics,
+        "lyrics_lrc": song.lyrics_lrc,
+        "has_plain": bool(song.lyrics),
+        "has_synced": bool(song.lyrics_lrc),
+    }
+
+
+@router.patch("/{song_id}/lyrics", status_code=204)
+def save_lyrics(song_id: UUID, body: schemas.LyricsSave, db: Session = Depends(get_db)):
+    """Manually save plain and/or synced lyrics."""
+    song = _get_song_or_404(db, song_id)
+    if body.lyrics is not None:
+        song.lyrics = body.lyrics or None
+    if body.lyrics_lrc is not None:
+        song.lyrics_lrc = body.lyrics_lrc or None
+    db.commit()
+
+
+@router.post("/{song_id}/lyrics/fetch")
+def fetch_lyrics_lrclib(song_id: UUID, db: Session = Depends(get_db)):
+    """Search LRCLIB and overwrite stored lyrics."""
+    song = (
+        db.query(models.Song)
+        .options(selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist))
+        .filter(models.Song.id == song_id)
+        .first()
+    )
+    if not song:
+        raise HTTPException(404, "Song not found")
+
+    artist_name = _principal_artist(song)
+    album_name = song.album.title if song.album else None
+
+    async def _call_lrclib():
+        params = {"track_name": song.title, "artist_name": artist_name}
+        if album_name:
+            params["album_name"] = album_name
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get("https://lrclib.net/api/get", params=params)
+            if resp.status_code == 200:
+                return resp.json()
+            # fallback: search without album
+            if album_name:
+                resp2 = await client.get("https://lrclib.net/api/get", params={
+                    "track_name": song.title, "artist_name": artist_name
+                })
+                if resp2.status_code == 200:
+                    return resp2.json()
+        return None
+
+    try:
+        data = asyncio.get_event_loop().run_until_complete(_call_lrclib())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        data = loop.run_until_complete(_call_lrclib())
+        loop.close()
+
+    if not data:
+        raise HTTPException(404, "Lyrics not found on LRCLIB for this song")
+
+    song.lyrics = data.get("plainLyrics") or song.lyrics
+    song.lyrics_lrc = data.get("syncedLyrics") or song.lyrics_lrc
+    db.commit()
+
+    return {
+        "lyrics": song.lyrics,
+        "lyrics_lrc": song.lyrics_lrc,
+        "has_plain": bool(song.lyrics),
+        "has_synced": bool(song.lyrics_lrc),
+    }
+
+
+@router.post("/{song_id}/lyrics/upload", status_code=204)
+async def upload_lyrics(
+    song_id: UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Upload a .lrc or .txt file to set lyrics."""
+    song = _get_song_or_404(db, song_id)
+    filename = (file.filename or "").lower()
+    content = (await file.read()).decode("utf-8", errors="replace")
+
+    if filename.endswith(".lrc"):
+        song.lyrics_lrc = content
+        # Also extract plain text from LRC (strip timestamps)
+        import re
+        plain_lines = re.sub(r"\[\d+:\d+\.\d+\]", "", content)
+        plain_lines = "\n".join(
+            line.strip() for line in plain_lines.splitlines() if line.strip()
+        )
+        if plain_lines:
+            song.lyrics = plain_lines
+    elif filename.endswith(".txt"):
+        song.lyrics = content
+    else:
+        raise HTTPException(400, "Only .lrc and .txt files are supported")
+
+    db.commit()
+
+
+@router.get("/{song_id}/lyrics/download")
+def download_lyrics(
+    song_id: UUID,
+    format: str = Query("lrc", regex="^(lrc|txt)$"),
+    db: Session = Depends(get_db),
+):
+    """Download lyrics as a .lrc or .txt file."""
+    song = (
+        db.query(models.Song)
+        .options(selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist))
+        .filter(models.Song.id == song_id)
+        .first()
+    )
+    if not song:
+        raise HTTPException(404, "Song not found")
+
+    safe_title = "".join(c for c in song.title if c.isalnum() or c in " -_").strip()
+
+    if format == "lrc":
+        content = song.lyrics_lrc or song.lyrics or ""
+        media_type = "text/plain"
+        filename = f"{safe_title}.lrc"
+    else:
+        content = song.lyrics or ""
+        media_type = "text/plain"
+        filename = f"{safe_title}.txt"
+
+    if not content:
+        raise HTTPException(404, f"No {format} lyrics available for this song")
+
+    return Response(
+        content=content.encode("utf-8"),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

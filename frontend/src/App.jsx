@@ -14,6 +14,7 @@ import Genres from './pages/Genres'
 import Moods from './pages/Moods'
 import Import from './pages/Import'
 import Settings from './pages/Settings'
+import SpotifyHistory from './pages/SpotifyHistory'
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="/moods" element={<Moods />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/spotify-history" element={<SpotifyHistory />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

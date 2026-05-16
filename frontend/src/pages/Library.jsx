@@ -8,6 +8,7 @@ import { getMoods } from '../api/moods'
 import { getPlaylists, addSongsToPlaylist } from '../api/playlists'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
+import LyricsModal from '../components/LyricsModal'
 import ErrorState from '../components/ErrorState'
 
 function fmt(seconds) {
@@ -323,6 +324,7 @@ export default function Library() {
   const [songModal, setSongModal] = useState(null)
   const [addToPlaylist, setAddToPlaylist] = useState(null)
   const [enriching, setEnriching] = useState(null)
+  const [lyricsModal, setLyricsModal] = useState(null)
 
   useEffect(() => {
     getGenres().then(setGenres).catch(() => {})
@@ -458,6 +460,11 @@ export default function Library() {
                           title="Agregar a playlist">
                           + Lista
                         </button>
+                        <button onClick={() => setLyricsModal(song)}
+                          className="text-yellow-400/70 hover:text-yellow-400 text-xs font-medium transition-colors"
+                          title={t('lyrics.title')}>
+                          ♪
+                        </button>
                         <button onClick={() => handleEnrich(song.id)} disabled={enriching === song.id}
                           className="text-blue-400/70 hover:text-blue-400 text-xs font-medium transition-colors disabled:opacity-40"
                           title="Enriquecer metadata">
@@ -511,6 +518,10 @@ export default function Library() {
 
       {addToPlaylist && (
         <AddToPlaylistModal songId={addToPlaylist} onClose={() => setAddToPlaylist(null)} />
+      )}
+
+      {lyricsModal && (
+        <LyricsModal song={lyricsModal} onClose={() => setLyricsModal(null)} />
       )}
     </div>
   )

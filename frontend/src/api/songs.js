@@ -7,3 +7,17 @@ export const updateSong  = (id, data) => api.put(`/songs/${id}`, data).then(r =>
 export const deleteSong  = (id)     => api.delete(`/songs/${id}`)
 export const enrichSong  = (id)     => api.post(`/songs/${id}/enrich`).then(r => r.data)
 export const getSongCovers = (id)   => api.get(`/songs/${id}/covers`).then(r => r.data)
+
+// Lyrics
+export const getLyrics      = (id)         => api.get(`/songs/${id}/lyrics`).then(r => r.data)
+export const saveLyrics     = (id, data)   => api.patch(`/songs/${id}/lyrics`, data)
+export const fetchLyrics    = (id)         => api.post(`/songs/${id}/lyrics/fetch`).then(r => r.data)
+export const uploadLyrics   = (id, file)   => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/songs/${id}/lyrics/upload`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+export const downloadLyrics = (id, format) =>
+  api.get(`/songs/${id}/lyrics/download`, { params: { format }, responseType: 'blob' }).then(r => r.data)

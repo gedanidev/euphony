@@ -194,9 +194,18 @@ class ListenHistory(Base):
     __tablename__ = "listen_history"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    song_id = Column(UUID(as_uuid=True), ForeignKey("songs.id", ondelete="CASCADE"), nullable=False, index=True)
+    # song_id is nullable: Spotify-synced entries start without a library song
+    song_id = Column(UUID(as_uuid=True), ForeignKey("songs.id", ondelete="SET NULL"), nullable=True, index=True)
     played_at = Column(DateTime(timezone=True), nullable=False, index=True)
     source = Column(String(20), nullable=False, default="manual")  # walkman, spotify, manual, lastfm
+
+    # Raw track data from Spotify (populated when song_id is None)
+    track_title = Column(String(500))
+    artist_name = Column(String(500))
+    album_name = Column(String(500))
+    spotify_track_id = Column(String(100), index=True)
+    cover_url = Column(Text)
+    duration_ms = Column(Integer)
 
     song = relationship("Song", back_populates="listen_history")
 

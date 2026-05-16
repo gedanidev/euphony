@@ -260,6 +260,11 @@ class ImportSummary(BaseModel):
 # Listen history
 # ---------------------------------------------------------------------------
 
+class LyricsSave(BaseModel):
+    lyrics: Optional[str] = None
+    lyrics_lrc: Optional[str] = None
+
+
 class ListenHistoryCreate(BaseModel):
     song_id: UUID
     played_at: datetime
@@ -267,11 +272,32 @@ class ListenHistoryCreate(BaseModel):
 
 class ListenHistoryRead(BaseModel):
     id: UUID
-    song_id: UUID
+    song_id: Optional[UUID] = None
     played_at: datetime
     source: str
 
     model_config = {"from_attributes": True}
+
+
+class SpotifyPlayEntry(BaseModel):
+    played_at: datetime
+    source: str
+
+
+class SpotifyHistoryTrack(BaseModel):
+    """A unique track from Spotify history with aggregated play info."""
+    spotify_track_id: Optional[str] = None
+    track_title: str
+    artist_name: str
+    album_name: Optional[str] = None
+    cover_url: Optional[str] = None
+    duration_ms: Optional[int] = None
+    play_count: int
+    last_played_at: datetime
+    plays: List[SpotifyPlayEntry]
+    # If the track has been added to library
+    song_id: Optional[UUID] = None
+    availability: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
