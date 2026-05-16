@@ -314,3 +314,43 @@ class PaginatedPlaylists(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# ---------------------------------------------------------------------------
+# User / Auth
+# ---------------------------------------------------------------------------
+
+class UserRead(BaseModel):
+    id: UUID
+    email: str
+    display_name: Optional[str] = None
+    is_superuser: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    display_name: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    display_name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+    turnstile_token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    turnstile_token: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
