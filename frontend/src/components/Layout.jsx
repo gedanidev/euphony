@@ -101,7 +101,7 @@ export default function Layout({ children }) {
   )
 
   return (
-    <div className="flex flex-col h-full bg-[#0f0f13] text-[#e2e8f0] overflow-hidden lg:flex-row">
+    <div className="flex flex-col h-dvh bg-[#0f0f13] text-[#e2e8f0] overflow-hidden lg:flex-row">
 
       {/* Mobile header */}
       <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#1a1a24] border-b border-[#2e2e4a] flex-shrink-0">

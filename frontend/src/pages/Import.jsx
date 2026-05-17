@@ -1,8 +1,26 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { importM3U8 } from '../api/import'
+import { importM3U8, importItunesXml } from '../api/import'
+
+const FORMATS = [
+  {
+    id: 'xml',
+    accept: '.xml',
+    labelKey: 'import.format.xml.label',
+    descKey: 'import.format.xml.desc',
+    exampleKey: 'import.format.xml.example',
+  },
+  {
+    id: 'm3u',
+    accept: '.m3u,.m3u8',
+    labelKey: 'import.format.m3u.label',
+    descKey: 'import.format.m3u.desc',
+    exampleKey: 'import.format.m3u.example',
+  },
+]
 
 export default function Import() {
+  const [formatId, setFormatId] = useState('xml')
   const [file, setFile] = useState(null)
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -11,6 +29,15 @@ export default function Import() {
   const [showFailed, setShowFailed] = useState(false)
   const inputRef = useRef(null)
   const { t } = useTranslation()
+
+  const fmt = FORMATS.find(f => f.id === formatId)
+
+  const handleFormatChange = (id) => {
+    setFormatId(id)
+    setFile(null)
+    setResult(null)
+    setError(null)
+  }
 
   const handleDrop = (e) => {
     e.preventDefault()
@@ -23,7 +50,8 @@ export default function Import() {
     if (!file) return
     setLoading(true); setResult(null); setError(null)
     try {
-      const summary = await importM3U8(file)
+      const fn = formatId === 'xml' ? importItunesXml : importM3U8
+      const summary = await fn(file)
       setResult(summary)
       setFile(null)
     } catch (e) {
@@ -34,9 +62,24 @@ export default function Import() {
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">{t('import.title')}</h1>
-      <p className="text-[#94a3b8] text-sm mb-8">
-        {t('import.desc')}
-      </p>
+      <p className="text-[#94a3b8] text-sm mb-6">{t('import.desc')}</p>
+
+      {/* Format tabs */}
+      <div className="flex gap-2 mb-6">
+        {FORMATS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => handleFormatChange(f.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              formatId === f.id
+                ? 'bg-purple-600 text-white'
+                : 'bg-[#1a1a24] text-[#94a3b8] hover:text-white hover:bg-[#22223a]'
+            }`}
+          >
+            {t(f.labelKey)}
+          </button>
+        ))}
+      </div>
 
       {/* Drop zone */}
       <div
@@ -48,7 +91,13 @@ export default function Import() {
           dragging ? 'border-purple-500 bg-purple-500/10' : file ? 'border-green-500/50 bg-green-500/5' : 'border-[#2e2e4a] hover:border-purple-500/50 hover:bg-[#22223a]/50'
         }`}
       >
-        <input ref={inputRef} type="file" accept=".m3u,.m3u8" className="hidden" onChange={e => setFile(e.target.files[0])} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept={fmt.accept}
+          className="hidden"
+          onChange={e => setFile(e.target.files[0])}
+        />
 
         {file ? (
           <div>
@@ -69,7 +118,7 @@ export default function Import() {
               </svg>
             </div>
             <p className="font-medium text-[#e2e8f0]">{t('import.drop')}</p>
-            <p className="text-xs text-[#94a3b8] mt-1">{t('import.dropSub')}</p>
+            <p className="text-xs text-[#94a3b8] mt-1">{t(fmt.descKey)}</p>
           </div>
         )}
       </div>
@@ -109,7 +158,7 @@ export default function Import() {
             <div>
               <button onClick={() => setShowFailed(!showFailed)}
                 className="text-sm text-[#94a3b8] hover:text-white transition-colors">
-                {showFailed ? '▼' : '▶'} Ver líneas con error ({result.failed_lines.length})
+                {showFailed ? '▼' : '▶'} Ver entradas con error ({result.failed_lines.length})
               </button>
               {showFailed && (
                 <div className="mt-2 bg-[#0f0f13] rounded-lg p-3 max-h-40 overflow-y-auto">
@@ -130,12 +179,8 @@ export default function Import() {
 
       {/* Format reference */}
       <div className="mt-8 bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-4">
-        <p className="text-xs text-[#94a3b8] font-semibold uppercase tracking-wider mb-2">{t('import.format')}</p>
-        <pre className="text-xs text-[#64748b] font-mono leading-relaxed">{`#EXTM3U
-#EXTINF:245,Lady Gaga - Die with a Smile
-/Walkman/Music/lady_gaga_die_with_a_smile.mp3
-#EXTINF:183,Bruno Mars - Just the Way You Are
-/Walkman/Music/bruno_mars_just_the_way.mp3`}</pre>
+        <p className="text-xs text-[#94a3b8] font-semibold uppercase tracking-wider mb-2">{t('import.format.ref')}</p>
+        <pre className="text-xs text-[#64748b] font-mono leading-relaxed">{t(fmt.exampleKey)}</pre>
       </div>
     </div>
   )

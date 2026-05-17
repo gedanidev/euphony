@@ -323,6 +323,7 @@ export default function PlaylistDetail() {
               Export ▾
             </button>
             <div className="absolute right-0 top-full mt-1 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg overflow-hidden hidden group-hover:block z-10 min-w-[80px]">
+              <button onClick={() => handleExport('m3u')}  className="block w-full px-4 py-2 text-sm text-left hover:bg-[#22223a] text-[#e2e8f0]">M3U</button>
               <button onClick={() => handleExport('json')} className="block w-full px-4 py-2 text-sm text-left hover:bg-[#22223a] text-[#e2e8f0]">JSON</button>
               <button onClick={() => handleExport('csv')}  className="block w-full px-4 py-2 text-sm text-left hover:bg-[#22223a] text-[#e2e8f0]">CSV</button>
             </div>

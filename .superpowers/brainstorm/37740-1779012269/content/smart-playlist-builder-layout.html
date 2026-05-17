@@ -1,0 +1,63 @@
+<h2>Smart Playlist Builder — ¿Dónde vive el constructor?</h2>
+<p class="subtitle">¿Cómo debería organizarse la feature dentro de la app?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Página propia en el sidebar</h3>
+      <p>Una nueva entrada "Smart Playlists" en el nav, junto a Playlists. Muestra lista de smart playlists creadas + botón para crear nueva. El builder abre en la misma página.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Vista previa</div>
+        <div class="mockup-body" style="display:flex;gap:0;padding:0;min-height:160px">
+          <div style="background:#1a1a2e;padding:12px 8px;width:130px;font-size:11px;border-right:1px solid #2e2e4a">
+            <div style="color:#94a3b8;margin-bottom:8px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em">MENÚ</div>
+            <div style="color:#e2e8f0;padding:6px 8px;background:#2e2e4a;border-radius:6px;margin-bottom:4px">🎵 Playlists</div>
+            <div style="color:#a78bfa;padding:6px 8px;background:#3d2d6e;border-radius:6px;margin-bottom:4px;border:1px solid #7c3aed">✨ Smart Playlists</div>
+            <div style="color:#94a3b8;padding:6px 8px;margin-bottom:4px">📚 Biblioteca</div>
+            <div style="color:#94a3b8;padding:6px 8px;margin-bottom:4px">🎤 Artistas</div>
+          </div>
+          <div style="flex:1;padding:12px;font-size:11px">
+            <div style="color:#e2e8f0;font-weight:600;margin-bottom:8px">Smart Playlists</div>
+            <div style="background:#1e1e30;border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              <span style="color:#e2e8f0">Rock de los 90s</span>
+              <span style="color:#94a3b8;font-size:10px">43 canciones</span>
+            </div>
+            <div style="background:#1e1e30;border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+              <span style="color:#e2e8f0">J-Pop disponible</span>
+              <span style="color:#94a3b8;font-size:10px">128 canciones</span>
+            </div>
+            <div style="border:1px dashed #3d3d5c;border-radius:6px;padding:8px;text-align:center;color:#7c3aed;font-size:11px">+ Nueva smart playlist</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Integrada en Playlists</h3>
+      <p>En la página de Playlists hay dos tabs: "Normales" y "Smart". El builder de smart playlists es un modal o panel lateral que se abre al crear/editar.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Vista previa</div>
+        <div class="mockup-body" style="padding:12px;font-size:11px;min-height:160px">
+          <div style="color:#e2e8f0;font-weight:600;margin-bottom:10px">Playlists</div>
+          <div style="display:flex;gap:6px;margin-bottom:12px">
+            <div style="padding:5px 12px;background:#2e2e4a;border-radius:20px;color:#94a3b8;font-size:11px">Normales (12)</div>
+            <div style="padding:5px 12px;background:#3d2d6e;border-radius:20px;color:#a78bfa;font-size:11px;border:1px solid #7c3aed">✨ Smart (3)</div>
+          </div>
+          <div style="background:#1e1e30;border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between">
+            <span style="color:#e2e8f0">Rock de los 90s</span>
+            <span style="color:#94a3b8;font-size:10px">43 canciones · Auto</span>
+          </div>
+          <div style="background:#1e1e30;border-radius:6px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between">
+            <span style="color:#e2e8f0">J-Pop disponible</span>
+            <span style="color:#94a3b8;font-size:10px">128 canciones · Auto</span>
+          </div>
+          <div style="border:1px dashed #3d3d5c;border-radius:6px;padding:8px;text-align:center;color:#7c3aed;font-size:11px">+ Nueva smart playlist</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -164,7 +164,7 @@ def reorder_songs(playlist_id: UUID, data: schemas.ReorderRequest, db: Session =
 @router.get("/{playlist_id}/export")
 def export_playlist(
     playlist_id: UUID,
-    format: str = Query("json", pattern="^(json|csv)$"),
+    format: str = Query("json", pattern="^(json|csv|m3u)$"),
     db: Session = Depends(get_db),
 ):
     pl = _load_detail(playlist_id, db)
@@ -193,6 +193,23 @@ def export_playlist(
         return JSONResponse(
             content=payload,
             headers={"Content-Disposition": f'attachment; filename="{pl.name}.json"'},
+        )
+
+    if format == "m3u":
+        lines = ["#EXTM3U", f"#PLAYLIST:{pl.name}"]
+        for s in songs:
+            duration = s.duration if s.duration else -1
+            artist = s.artist_display or ""
+            title = s.title or ""
+            lines.append(f"#EXTINF:{duration},{artist} - {title}")
+            # Use file_path if available, otherwise just the title as placeholder
+            lines.append(s.file_path or title)
+        content = "\n".join(lines) + "\n"
+        safe_name = "".join(c for c in pl.name if c.isalnum() or c in " -_").strip()
+        return StreamingResponse(
+            iter([content]),
+            media_type="audio/x-mpegurl",
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}.m3u"'},
         )
 
     output = io.StringIO()

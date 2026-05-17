@@ -1,0 +1,117 @@
+<h2>Constructor de condiciones — ¿Cómo se añaden las reglas?</h2>
+<p class="subtitle">¿Qué estilo de builder prefieres para definir las condiciones de la smart playlist?</p>
+
+<div class="options">
+
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Fila por condición (estilo iTunes)</h3>
+      <p>Cada condición es una fila: [Campo ▾] [Operador ▾] [Valor] [×]. Botón "Añadir condición" al final. Operador global AND/OR arriba.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Crear Smart Playlist</div>
+        <div class="mockup-body" style="font-size:11px;padding:14px;min-height:200px">
+          <div style="margin-bottom:10px">
+            <span style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em">Nombre</span>
+            <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:6px 10px;color:#e2e8f0;margin-top:4px">Rock de los 90s</div>
+          </div>
+          <div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Condiciones — Cumplir <span style="background:#2e2e4a;color:#a78bfa;padding:2px 8px;border-radius:4px">TODAS</span></div>
+
+          <!-- Row 1 -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 110px">
+              <option>Género</option>
+            </select>
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 90px">
+              <option>es</option>
+            </select>
+            <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:5px 10px;color:#e2e8f0;flex:1">Rock</div>
+            <div style="color:#ef4444;cursor:pointer;padding:4px 8px;background:#2a1a1a;border-radius:4px">×</div>
+          </div>
+
+          <!-- Row 2 -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 110px">
+              <option>Año</option>
+            </select>
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 90px">
+              <option>entre</option>
+            </select>
+            <div style="display:flex;gap:4px;flex:1">
+              <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:5px 10px;color:#e2e8f0;flex:1">1990</div>
+              <span style="color:#94a3b8;padding:5px 2px">—</span>
+              <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:5px 10px;color:#e2e8f0;flex:1">1999</div>
+            </div>
+            <div style="color:#ef4444;cursor:pointer;padding:4px 8px;background:#2a1a1a;border-radius:4px">×</div>
+          </div>
+
+          <!-- Row 3 -->
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 110px">
+              <option>Disponibilidad</option>
+            </select>
+            <select style="background:#1e1e30;border:1px solid #2e2e4a;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:11px;flex:0 0 90px">
+              <option>es</option>
+            </select>
+            <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:5px 10px;color:#e2e8f0;flex:1">Disponible</div>
+            <div style="color:#ef4444;cursor:pointer;padding:4px 8px;background:#2a1a1a;border-radius:4px">×</div>
+          </div>
+
+          <div style="color:#7c3aed;font-size:11px;cursor:pointer;margin-bottom:12px">+ Añadir condición</div>
+
+          <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:8px;color:#4ade80;font-size:10px">
+            ✓ 43 canciones coinciden con estas condiciones
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Chips agrupados por campo</h3>
+      <p>Las condiciones aparecen como chips/tags agrupadas por tipo. Haces clic en un campo para añadir su condición. Más visual, menos texto.</p>
+      <div class="mockup" style="margin-top:10px">
+        <div class="mockup-header">Crear Smart Playlist</div>
+        <div class="mockup-body" style="font-size:11px;padding:14px;min-height:200px">
+          <div style="margin-bottom:12px">
+            <div style="background:#12121a;border:1px solid #2e2e4a;border-radius:6px;padding:6px 10px;color:#e2e8f0">Rock de los 90s</div>
+          </div>
+
+          <div style="margin-bottom:10px">
+            <div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Género</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="background:#3d2d6e;color:#a78bfa;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:4px">Rock <span style="color:#7c3aed">×</span></span>
+              <span style="background:#1e1e30;color:#94a3b8;border:1px dashed #3d3d5c;padding:4px 10px;border-radius:20px;cursor:pointer">+ añadir género</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:10px">
+            <div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Año</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="background:#1e3d4a;color:#38bdf8;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:4px">1990–1999 <span style="color:#0ea5e9">×</span></span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:10px">
+            <div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Disponibilidad</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="background:#0f2a1a;color:#4ade80;padding:4px 10px;border-radius:20px;display:flex;align-items:center;gap:4px">Disponible <span style="color:#22c55e">×</span></span>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+            <span style="background:#1e1e30;color:#94a3b8;border:1px dashed #3d3d5c;padding:4px 10px;border-radius:20px;cursor:pointer;font-size:10px">+ Artista</span>
+            <span style="background:#1e1e30;color:#94a3b8;border:1px dashed #3d3d5c;padding:4px 10px;border-radius:20px;cursor:pointer;font-size:10px">+ Mood</span>
+          </div>
+
+          <div style="background:#0f1a0f;border:1px solid #1a3a1a;border-radius:6px;padding:8px;color:#4ade80;font-size:10px">
+            ✓ 43 canciones coinciden
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
