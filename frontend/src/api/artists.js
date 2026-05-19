@@ -10,3 +10,7 @@ export const getArtistSongs   = (id, params) => api.get(`/artists/${id}/songs`, 
 export const getArtistRelations    = (id)  => api.get(`/artists/${id}/relations`).then(r => r.data)
 export const addArtistRelation     = (id, data) => api.post(`/artists/${id}/relations`, data).then(r => r.data)
 export const deleteArtistRelation  = (artistId, relId) => api.delete(`/artists/${artistId}/relations/${relId}`)
+
+export const toggleArtistPreferred      = (id) => api.patch(`/artists/${id}/preferred`).then(r => r.data)
+export const setArtistImage             = (id, image_url) => api.patch(`/artists/${id}/image`, { image_url }).then(r => r.data)
+export const getArtistImageCandidates   = (id, search) => api.get(`/artists/${id}/image-candidates`, { params: search ? { search } : {} }).then(r => r.data.candidates)

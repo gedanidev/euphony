@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 from typing import Optional
 from uuid import UUID
+from pydantic import BaseModel
 
 from app.database import get_db
 from app import models, schemas
@@ -62,6 +64,7 @@ def get_album(album_id: UUID, db: Session = Depends(get_db)):
         .options(
             selectinload(models.Album.artist),
             selectinload(models.Album.songs).selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist),
+            selectinload(models.Album.songs).selectinload(models.Song.song_composers).selectinload(models.SongComposer.artist),
             selectinload(models.Album.songs).selectinload(models.Song.song_genres).selectinload(models.SongGenre.genre),
             selectinload(models.Album.songs).selectinload(models.Song.song_moods).selectinload(models.SongMood.mood),
         )
@@ -70,7 +73,26 @@ def get_album(album_id: UUID, db: Session = Depends(get_db)):
     )
     if not album:
         raise HTTPException(404, "Album not found")
-    return album
+
+    result = schemas.AlbumWithSongs.model_validate(album)
+    if album.artist_id:
+        band_rels = (
+            db.query(models.ArtistRelation)
+            .options(
+                selectinload(models.ArtistRelation.artist1),
+                selectinload(models.ArtistRelation.artist2),
+            )
+            .filter(
+                or_(
+                    models.ArtistRelation.artist1_id == album.artist_id,
+                    models.ArtistRelation.artist2_id == album.artist_id,
+                ),
+                models.ArtistRelation.relation_type == "band_member",
+            )
+            .all()
+        )
+        result.band_members = [schemas.ArtistRelationRead.model_validate(r) for r in band_rels]
+    return result
 
 
 @router.put("/{album_id}", response_model=schemas.AlbumRead)
@@ -87,3 +109,47 @@ def delete_album(album_id: UUID, db: Session = Depends(get_db)):
     album = _load_album(db, album_id)
     db.delete(album)
     db.commit()
+
+
+class AlbumRatingBody(BaseModel):
+    rating: Optional[int] = None
+
+
+@router.patch("/{album_id}/rating", response_model=schemas.AlbumRead)
+def set_album_rating(album_id: UUID, body: AlbumRatingBody, db: Session = Depends(get_db)):
+    album = _load_album(db, album_id)
+    if body.rating is not None and not (1 <= body.rating <= 10):
+        raise HTTPException(status_code=422, detail="Rating must be between 1 and 10")
+    album.rating = body.rating
+    db.commit()
+    return _load_album(db, album_id)
+
+
+class CoverBody(BaseModel):
+    cover_url: Optional[str] = None  # null para borrar
+
+
+@router.patch("/{album_id}/cover", response_model=schemas.AlbumRead)
+def set_album_cover(album_id: UUID, body: CoverBody, db: Session = Depends(get_db)):
+    """Actualiza manualmente la portada del álbum."""
+    album = _load_album(db, album_id)
+    album.cover_url = body.cover_url or None
+    db.commit()
+    return _load_album(db, album_id)
+
+
+@router.get("/{album_id}/cover-candidates")
+def get_cover_candidates(album_id: UUID, db: Session = Depends(get_db)):
+    """Devuelve URLs candidatas para la portada del álbum (TheAudioDB + Cover Art Archive)."""
+    from app.routers.enrich import _fetch_cover_candidates, _run
+    album = (
+        db.query(models.Album)
+        .options(selectinload(models.Album.artist))
+        .filter(models.Album.id == album_id)
+        .first()
+    )
+    if not album:
+        raise HTTPException(404, "Album not found")
+    artist_name = album.artist.name if album.artist else None
+    candidates = _run(_fetch_cover_candidates(album.title, artist_name))
+    return {"candidates": candidates}

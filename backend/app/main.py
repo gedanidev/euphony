@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import songs, playlists, artists, albums, genres, moods, import_routes, enrich, auth
+from app.routers import songs, playlists, artists, albums, genres, moods, import_routes, enrich, auth, smart_playlists
 from app.routers import user_auth
 from app.routers.user_auth import get_current_user
 
@@ -33,6 +33,7 @@ app.include_router(genres.router, prefix="/api", dependencies=_auth_dep)
 app.include_router(moods.router, prefix="/api", dependencies=_auth_dep)
 app.include_router(import_routes.router, prefix="/api", dependencies=_auth_dep)
 app.include_router(enrich.router, prefix="/api", dependencies=_auth_dep)
+app.include_router(smart_playlists.router, prefix="/api", dependencies=_auth_dep)
 
 
 @app.get("/api/health")

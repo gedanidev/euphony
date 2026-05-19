@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getSongs, createSong, updateSong, deleteSong, enrichSong, batchDelete, batchAvailability, batchDeleteAll } from '../api/songs'
+import { getSongs, createSong, updateSong, deleteSong, enrichSong, batchDelete, batchAvailability, batchDeleteAll, setSongRating, toggleSongFavorite } from '../api/songs'
 import { getArtists, createArtist } from '../api/artists'
 import { getAlbums } from '../api/albums'
 import { getGenres } from '../api/genres'
@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import LyricsModal from '../components/LyricsModal'
 import ErrorState from '../components/ErrorState'
+import RatingStars from '../components/RatingStars'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -135,8 +136,8 @@ function SongModal({ initial, onClose, onSaved }) {
   const [genres, setGenres] = useState([])
   const [moods, setMoods] = useState([])
   const [albums, setAlbums] = useState([])
-  const [selGenres, setSelGenres] = useState(initial?.genres?.map(g => g.id) || [])
-  const [selMoods, setSelMoods] = useState(initial?.moods?.map(m => m.id) || [])
+  const [selGenres, setSelGenres] = useState(initial?.genres?.map(g => g.genre?.id ?? g.id) || [])
+  const [selMoods, setSelMoods] = useState(initial?.moods?.map(m => m.mood?.id ?? m.id) || [])
   const [saving, setSaving] = useState(false)
   const isEdit = !!initial?.id
 
@@ -316,10 +317,11 @@ export default function Library() {
   const [availability, setAvailability] = useState('')
   const [filterGenre, setFilterGenre] = useState('')
   const [filterMood, setFilterMood] = useState('')
-  const [page, setPage] = useState(1)
+  const [sortBy, setSortBy] = useState('title')
+  const [sortDir, setSortDir] = useState('asc')
   const [genres, setGenres] = useState([])
   const [moods, setMoods] = useState([])
-  const limit = 50
+  const limit = 20000
 
   const [songModal, setSongModal] = useState(null)
   const [addToPlaylist, setAddToPlaylist] = useState(null)
@@ -337,7 +339,7 @@ export default function Library() {
   const load = async () => {
     try {
       setLoading(true); setError(null)
-      const params = { search: search || undefined, page, limit }
+      const params = { search: search || undefined, page: 1, limit, sort_by: sortBy, sort_dir: sortDir }
       if (availability) params.availability = availability
       if (filterGenre) params.genre_id = filterGenre
       if (filterMood) params.mood_id = filterMood
@@ -347,13 +349,22 @@ export default function Library() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [search, page, availability, filterGenre, filterMood])
-  useEffect(() => { setPage(1) }, [search, availability, filterGenre, filterMood])
+  useEffect(() => { load() }, [search, availability, filterGenre, filterMood, sortBy, sortDir])
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta canción?')) return
     await deleteSong(id)
     load()
+  }
+
+  const handleRating = async (songId, rating) => {
+    await setSongRating(songId, rating)
+    setSongs(prev => prev.map(s => s.id === songId ? { ...s, rating } : s))
+  }
+
+  const handleFavorite = async (songId) => {
+    const updated = await toggleSongFavorite(songId)
+    setSongs(prev => prev.map(s => s.id === songId ? { ...s, is_favorite: updated.is_favorite } : s))
   }
 
   const handleEnrich = async (id) => {
@@ -407,7 +418,25 @@ export default function Library() {
     } finally { setBatchLoading(false) }
   }
 
-  const totalPages = Math.ceil(total / limit)
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
+  }
+
+  const SortTh = ({ col, label, className = '' }) => {
+    const active = sortBy === col
+    return (
+      <th className={`px-4 py-3 cursor-pointer select-none hover:text-white transition-colors ${active ? 'text-white' : ''} ${className}`}
+        onClick={() => toggleSort(col)}>
+        <span className="flex items-center gap-1">
+          {label}
+          <span className="text-xs opacity-60">
+            {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+          </span>
+        </span>
+      </th>
+    )
+  }
 
   return (
     <div className="p-6">
@@ -512,10 +541,9 @@ export default function Library() {
       )}
 
       {!loading && !error && songs.length > 0 && (
-        <>
-          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl overflow-hidden">
-            <table className="w-full text-left">
-              <thead>
+        <div className="overflow-x-auto rounded-xl border border-[#2e2e4a]" style={{ maxHeight: 'calc(100dvh - 280px)', overflowY: 'auto' }}>
+          <table className="w-full min-w-[700px] text-left bg-[#1a1a24]">
+              <thead className="sticky top-0 z-10 bg-[#1a1a24]">
                 <tr className="border-b border-[#2e2e4a] text-[#94a3b8] text-xs uppercase tracking-wider">
                   <th className="px-3 py-3 w-8">
                     <input type="checkbox"
@@ -524,12 +552,14 @@ export default function Library() {
                       onChange={e => e.target.checked ? selectAll() : clearSelection()}
                     />
                   </th>
-                  <th className="px-4 py-3">{t('library.col.title')}</th>
-                  <th className="px-4 py-3">{t('library.col.artist')}</th>
-                  <th className="px-4 py-3">{t('library.col.album')}</th>
+                  <SortTh col="title" label={t('library.col.title')} />
+                  <SortTh col="artist" label={t('library.col.artist')} />
+                  <SortTh col="album" label={t('library.col.album')} />
                   <th className="px-4 py-3">{t('library.col.year')}</th>
                   <th className="px-4 py-3">{t('library.col.status')}</th>
                   <th className="px-4 py-3 text-right">{t('library.col.duration')}</th>
+                  <th className="px-4 py-3" />
+                  <th className="px-2 py-3 w-8" />
                   <th className="px-4 py-3 w-40" />
                 </tr>
               </thead>
@@ -549,6 +579,22 @@ export default function Library() {
                     <td className="px-4 py-2 text-[#94a3b8]">{song.year || '—'}</td>
                     <td className="px-4 py-2"><AvailabilityBadge value={song.availability} /></td>
                     <td className="px-4 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <RatingStars
+                        rating={song.rating}
+                        onChange={(r) => handleRating(song.id, r)}
+                        compact
+                      />
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <button
+                        onClick={e => { e.stopPropagation(); handleFavorite(song.id) }}
+                        className={`text-lg transition-colors ${song.is_favorite ? 'text-pink-500' : 'text-[#3d3d5c] hover:text-pink-400'}`}
+                        title={song.is_favorite ? t('favorite.remove') : t('favorite.add')}
+                      >
+                        {song.is_favorite ? '♥' : '♡'}
+                      </button>
+                    </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all justify-end">
                         <button onClick={() => setAddToPlaylist(song.id)}
@@ -586,22 +632,7 @@ export default function Library() {
                 ))}
               </tbody>
             </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3 mt-5">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white disabled:cursor-not-allowed transition-colors">
-                {t('common.prev')}
-              </button>
-              <span className="text-[#94a3b8] text-sm">{page} / {totalPages}</span>
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white disabled:cursor-not-allowed transition-colors">
-                {t('common.next')}
-              </button>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {songModal && (

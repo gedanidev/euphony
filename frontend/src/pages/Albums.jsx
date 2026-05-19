@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { getAlbums, createAlbum, deleteAlbum } from '../api/albums'
 import { getArtists } from '../api/artists'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -82,6 +83,7 @@ function CreateAlbumModal({ onClose, onSaved }) {
 
 export default function Albums() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [albums, setAlbums] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -144,7 +146,8 @@ export default function Albums() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {albums.map(album => (
               <div key={album.id}
-                className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-4 hover:border-purple-500/50 hover:bg-[#22223a] transition-all group relative">
+                onClick={() => navigate(`/albums/${album.id}`)}
+                className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-4 hover:border-purple-500/50 hover:bg-[#22223a] transition-all group relative cursor-pointer">
                 <div className="w-full aspect-square rounded-lg bg-[#22223a] mb-3 flex items-center justify-center overflow-hidden">
                   {album.cover_url ? (
                     <img src={album.cover_url} alt={album.title} className="w-full h-full object-cover" />
@@ -158,7 +161,7 @@ export default function Albums() {
                 <p className="font-medium text-sm text-[#e2e8f0] truncate">{album.title}</p>
                 {album.artist && <p className="text-xs text-[#94a3b8] truncate mt-0.5">{album.artist.name}</p>}
                 {album.year && <p className="text-xs text-[#94a3b8] mt-0.5">{album.year}</p>}
-                <button onClick={(e) => handleDelete(e, album.id)}
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(e, album.id) }}
                   className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-400/50 hover:text-red-400 transition-all">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

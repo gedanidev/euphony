@@ -68,8 +68,10 @@ def list_songs(
     artist_id: Optional[UUID] = Query(None),
     genre_id: Optional[UUID] = Query(None),
     mood_id: Optional[UUID] = Query(None),
+    sort_by: Optional[str] = Query("title", regex="^(title|artist|album)$"),
+    sort_dir: Optional[str] = Query("asc", regex="^(asc|desc)$"),
     page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=20000),
     db: Session = Depends(get_db),
 ):
     q = db.query(models.Song).options(
@@ -106,14 +108,24 @@ def list_songs(
             models.SongMood.mood_id == mood_id
         )
 
-    total = q.distinct().count()
-    items = (
-        q.distinct()
-        .order_by(models.Song.title)
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
-    )
+    # Fetch all matching songs; sort in Python to avoid PostgreSQL DISTINCT + ORDER BY join conflicts
+    all_items = q.distinct().all()
+    total = len(all_items)
+
+    reverse = sort_dir == "desc"
+    if sort_by == "artist":
+        def _artist_key(s):
+            for sa in s.song_artists:
+                if sa.role == "principal":
+                    return sa.artist.name.lower()
+            return s.song_artists[0].artist.name.lower() if s.song_artists else ""
+        all_items.sort(key=_artist_key, reverse=reverse)
+    elif sort_by == "album":
+        all_items.sort(key=lambda s: (s.album.title.lower() if s.album else ""), reverse=reverse)
+    else:
+        all_items.sort(key=lambda s: s.title.lower(), reverse=reverse)
+
+    items = all_items[(page - 1) * limit: page * limit]
     return {"items": items, "total": total, "page": page, "limit": limit}
 
 
@@ -382,3 +394,27 @@ def download_lyrics(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+class RatingBody(BaseModel):
+    rating: Optional[int] = None  # null clears it
+
+
+@router.patch("/{song_id}/rating", response_model=schemas.SongRead)
+def set_song_rating(song_id: UUID, body: RatingBody, db: Session = Depends(get_db)):
+    song = _load_song(db, song_id)
+    if body.rating is not None and not (1 <= body.rating <= 10):
+        raise HTTPException(status_code=422, detail="Rating must be between 1 and 10")
+    song.rating = body.rating
+    db.commit()
+    db.refresh(song)
+    return _load_song(db, song_id)
+
+
+@router.patch("/{song_id}/favorite", response_model=schemas.SongRead)
+def toggle_song_favorite(song_id: UUID, db: Session = Depends(get_db)):
+    song = _load_song(db, song_id)
+    song.is_favorite = not song.is_favorite
+    db.commit()
+    db.refresh(song)
+    return _load_song(db, song_id)

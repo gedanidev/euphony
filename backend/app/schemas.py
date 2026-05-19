@@ -1,9 +1,9 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +48,7 @@ class ArtistBase(BaseModel):
     image_url: Optional[str] = None
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    is_preferred: bool = False
 
 class ArtistCreate(ArtistBase):
     pass
@@ -60,6 +61,7 @@ class ArtistUpdate(BaseModel):
     image_url: Optional[str] = None
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    is_preferred: Optional[bool] = None
 
 class ArtistRead(ArtistBase):
     id: UUID
@@ -92,6 +94,7 @@ class AlbumBase(BaseModel):
     cover_url: Optional[str] = None
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    rating: Optional[int] = None
 
 class AlbumCreate(AlbumBase):
     pass
@@ -103,6 +106,7 @@ class AlbumUpdate(BaseModel):
     cover_url: Optional[str] = None
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    rating: Optional[int] = None
 
 class AlbumRead(AlbumBase):
     id: UUID
@@ -124,6 +128,22 @@ class SongArtistRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class SongGenreRead(BaseModel):
+    genre: GenreRead
+
+    model_config = {"from_attributes": True}
+
+class SongMoodRead(BaseModel):
+    mood: MoodRead
+
+    model_config = {"from_attributes": True}
+
+class SongComposerRead(BaseModel):
+    artist: ArtistRead
+    order: int
+
+    model_config = {"from_attributes": True}
+
 class SongBase(BaseModel):
     title: str
     album_id: Optional[UUID] = None
@@ -137,6 +157,8 @@ class SongBase(BaseModel):
     availability: str = "available"
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    rating: Optional[int] = None
+    is_favorite: bool = False
 
 class SongCreate(SongBase):
     # First artist in list becomes principal unless artist_roles overrides
@@ -159,6 +181,8 @@ class SongUpdate(BaseModel):
     availability: Optional[str] = None
     mbid: Optional[str] = None
     spotify_id: Optional[str] = None
+    rating: Optional[int] = None
+    is_favorite: Optional[bool] = None
     artist_ids: Optional[List[UUID]] = None
     artist_roles: Optional[List[dict]] = None
     composer_ids: Optional[List[UUID]] = None
@@ -169,13 +193,13 @@ class SongRead(SongBase):
     id: UUID
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    artists: List[SongArtistRead] = []
-    composers: List[ArtistRead] = []
-    genres: List[GenreRead] = []
-    moods: List[MoodRead] = []
+    artists: List[SongArtistRead] = Field(default=[], validation_alias="song_artists")
+    composers: List[SongComposerRead] = Field(default=[], validation_alias="song_composers")
+    genres: List[SongGenreRead] = Field(default=[], validation_alias="song_genres")
+    moods: List[SongMoodRead] = Field(default=[], validation_alias="song_moods")
     album: Optional[AlbumRead] = None
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @computed_field
     @property
@@ -191,6 +215,7 @@ class SongRead(SongBase):
 
 class AlbumWithSongs(AlbumRead):
     songs: List[SongRead] = []
+    band_members: List[ArtistRelationRead] = []
 
 class ArtistWithSongs(ArtistRead):
     songs: List[SongRead] = []
@@ -380,3 +405,41 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+# ---------------------------------------------------------------------------
+# Smart Playlists
+# ---------------------------------------------------------------------------
+
+class SmartPlaylistCondition(BaseModel):
+    field: str   # "artist", "album", "genre", "mood", "year", "availability", "rating", "is_favorite", "artist_preferred"
+    op: str      # "contains", "not_contains", "is", "is_not", "starts_with", "ends_with", "gt", "lt", "between"
+    value: Any   # str, int, bool, or list of two ints for "between"
+
+class SmartPlaylistCreate(BaseModel):
+    name: str
+    match_all: bool = True
+    conditions: List[SmartPlaylistCondition] = []
+
+class SmartPlaylistUpdate(BaseModel):
+    name: Optional[str] = None
+    match_all: Optional[bool] = None
+    conditions: Optional[List[SmartPlaylistCondition]] = None
+
+class SmartPlaylistRead(BaseModel):
+    id: UUID
+    name: str
+    match_all: bool
+    conditions: List[SmartPlaylistCondition]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+class SmartPlaylistPreviewRequest(BaseModel):
+    match_all: bool = True
+    conditions: List[SmartPlaylistCondition] = []
+
+class SmartPlaylistPreviewResponse(BaseModel):
+    song_count: int
+    songs: List[SongRead] = []

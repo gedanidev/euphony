@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 from typing import Optional, List
 from uuid import UUID
+from pydantic import BaseModel
 
 from app.database import get_db
 from app import models, schemas
@@ -194,3 +195,40 @@ def delete_artist_relation(artist_id: UUID, relation_id: UUID, db: Session = Dep
         raise HTTPException(404, "Relation not found")
     db.delete(relation)
     db.commit()
+
+
+@router.patch("/{artist_id}/preferred", response_model=schemas.ArtistRead)
+def toggle_artist_preferred(artist_id: UUID, db: Session = Depends(get_db)):
+    artist = _load_artist(db, artist_id)
+    artist.is_preferred = not artist.is_preferred
+    db.commit()
+    db.refresh(artist)
+    return artist
+
+
+class ImageBody(BaseModel):
+    image_url: Optional[str] = None  # null para borrar
+
+
+@router.get("/{artist_id}/image-candidates")
+def get_image_candidates(
+    artist_id: UUID,
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Devuelve URLs candidatas para la imagen del artista (TheAudioDB + Wikipedia)."""
+    from app.routers.enrich import _fetch_artist_image_candidates, _run
+    artist = _load_artist(db, artist_id)
+    query = search.strip() if search else artist.name
+    candidates = _run(_fetch_artist_image_candidates(query))
+    return {"candidates": candidates}
+
+
+@router.patch("/{artist_id}/image", response_model=schemas.ArtistRead)
+def set_artist_image(artist_id: UUID, body: ImageBody, db: Session = Depends(get_db)):
+    """Actualiza manualmente la imagen del artista."""
+    artist = _load_artist(db, artist_id)
+    artist.image_url = body.image_url or None
+    db.commit()
+    db.refresh(artist)
+    return artist

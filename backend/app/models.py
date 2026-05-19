@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import (
     Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint, Boolean
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -27,6 +27,7 @@ class Artist(Base):
     image_url = Column(String(500))
     mbid = Column(String(36), unique=True)
     spotify_id = Column(String(100), unique=True)
+    is_preferred = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -53,6 +54,7 @@ class Album(Base):
     cover_url = Column(String(500))
     mbid = Column(String(36), unique=True)
     spotify_id = Column(String(100), unique=True)
+    rating = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -99,6 +101,8 @@ class Song(Base):
     availability = Column(String(20), nullable=False, default="available")
     mbid = Column(String(36))
     spotify_id = Column(String(100))
+    rating = Column(Integer, nullable=True)
+    is_favorite = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -258,3 +262,18 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     is_superuser = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=_now)
+
+
+# ---------------------------------------------------------------------------
+# Smart Playlists
+# ---------------------------------------------------------------------------
+
+class SmartPlaylist(Base):
+    __tablename__ = "smart_playlists"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    match_all = Column(Boolean, nullable=False, default=True)  # True=AND, False=OR
+    conditions = Column(JSONB, nullable=False, default=list)
+    created_at = Column(DateTime(timezone=True), default=_now)
+    updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
