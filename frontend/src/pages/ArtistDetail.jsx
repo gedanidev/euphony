@@ -451,7 +451,7 @@ export default function ArtistDetail() {
 
       {imageModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setImageModal(false)}>
-          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg h-[600px] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4">Imagen del artista</h2>
 
             <div className="flex gap-2 mb-4">
