@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import and_, or_
+import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -26,8 +27,28 @@ def _build_filter(condition: schemas.SmartPlaylistCondition):
     if field == "album":
         return _str_filter(models.Album.title, op, value)
 
-    if field == "genre":
-        return _str_filter(models.Genre.name, op, value)
+    if field == "primary_genre":
+        return _str_filter(models.Song.primary_genre, op, value)
+
+    if field == "subgenre":
+        # JSONB contains: check if Song.subgenres contains the string value
+        v = str(value)
+        if op == "is":
+            return models.Song.subgenres.contains([v])
+        if op == "is_not":
+            return ~models.Song.subgenres.contains([v])
+        if op == "contains":
+            return sa.cast(models.Song.subgenres, sa.Text).ilike(f"%{v}%")
+        if op == "not_contains":
+            return ~sa.cast(models.Song.subgenres, sa.Text).ilike(f"%{v}%")
+        return None
+
+    if field == "vocal_type":
+        if op == "is":
+            return models.Song.vocal_type == value
+        if op == "is_not":
+            return models.Song.vocal_type != value
+        return None
 
     if field == "mood":
         return _str_filter(models.Mood.name, op, value)
@@ -96,8 +117,6 @@ def _execute_conditions(
         .outerjoin(models.SongArtist, models.SongArtist.song_id == models.Song.id)
         .outerjoin(models.Artist, models.Artist.id == models.SongArtist.artist_id)
         .outerjoin(models.Album, models.Album.id == models.Song.album_id)
-        .outerjoin(models.SongGenre, models.SongGenre.song_id == models.Song.id)
-        .outerjoin(models.Genre, models.Genre.id == models.SongGenre.genre_id)
         .outerjoin(models.SongMood, models.SongMood.song_id == models.Song.id)
         .outerjoin(models.Mood, models.Mood.id == models.SongMood.mood_id)
         .options(
