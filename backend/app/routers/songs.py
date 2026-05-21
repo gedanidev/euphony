@@ -20,7 +20,6 @@ def _load_song(db: Session, song_id: UUID) -> models.Song:
         .options(
             selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist),
             selectinload(models.Song.song_composers).selectinload(models.SongComposer.artist),
-            selectinload(models.Song.song_genres).selectinload(models.SongGenre.genre),
             selectinload(models.Song.song_moods).selectinload(models.SongMood.mood),
             selectinload(models.Song.album).selectinload(models.Album.artist),
         )
@@ -50,11 +49,6 @@ def _apply_relations(db: Session, song: models.Song, data: schemas.SongCreate | 
         for idx, artist_id in enumerate(data.composer_ids):
             db.add(models.SongComposer(song_id=song.id, artist_id=artist_id, order=idx))
 
-    if data.genre_ids is not None:
-        db.query(models.SongGenre).filter(models.SongGenre.song_id == song.id).delete()
-        for genre_id in data.genre_ids:
-            db.add(models.SongGenre(song_id=song.id, genre_id=genre_id))
-
     if data.mood_ids is not None:
         db.query(models.SongMood).filter(models.SongMood.song_id == song.id).delete()
         for mood_id in data.mood_ids:
@@ -66,7 +60,6 @@ def list_songs(
     search: Optional[str] = Query(None),
     availability: Optional[str] = Query(None),
     artist_id: Optional[UUID] = Query(None),
-    genre_id: Optional[UUID] = Query(None),
     mood_id: Optional[UUID] = Query(None),
     sort_by: Optional[str] = Query("title", regex="^(title|artist|album)$"),
     sort_dir: Optional[str] = Query("asc", regex="^(asc|desc)$"),
@@ -77,7 +70,6 @@ def list_songs(
     q = db.query(models.Song).options(
         selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist),
         selectinload(models.Song.song_composers).selectinload(models.SongComposer.artist),
-        selectinload(models.Song.song_genres).selectinload(models.SongGenre.genre),
         selectinload(models.Song.song_moods).selectinload(models.SongMood.mood),
         selectinload(models.Song.album).selectinload(models.Album.artist),
     )
@@ -96,11 +88,6 @@ def list_songs(
     if artist_id:
         q = q.join(models.SongArtist, models.SongArtist.song_id == models.Song.id).filter(
             models.SongArtist.artist_id == artist_id
-        )
-
-    if genre_id:
-        q = q.join(models.SongGenre, models.SongGenre.song_id == models.Song.id).filter(
-            models.SongGenre.genre_id == genre_id
         )
 
     if mood_id:
@@ -129,9 +116,36 @@ def list_songs(
     return {"items": items, "total": total, "page": page, "limit": limit}
 
 
+@router.get("/genres-used", response_model=List[str])
+def get_genres_used(db: Session = Depends(get_db)):
+    """Returns distinct primary_genre values used by songs (non-null, sorted)."""
+    rows = (
+        db.query(models.Song.primary_genre)
+        .filter(models.Song.primary_genre.isnot(None))
+        .distinct()
+        .order_by(models.Song.primary_genre)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.get("/subgenres-used", response_model=List[str])
+def get_subgenres_used(db: Session = Depends(get_db)):
+    """Returns distinct subgenre strings across all songs' subgenres JSONB arrays (sorted)."""
+    from sqlalchemy import text
+    rows = db.execute(
+        text(
+            "SELECT DISTINCT jsonb_array_elements_text(subgenres) AS sg "
+            "FROM songs WHERE subgenres != '[]'::jsonb "
+            "ORDER BY sg"
+        )
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 @router.post("", response_model=schemas.SongRead, status_code=201)
 def create_song(data: schemas.SongCreate, db: Session = Depends(get_db)):
-    song_fields = data.model_dump(exclude={"artist_ids", "artist_roles", "composer_ids", "genre_ids", "mood_ids"})
+    song_fields = data.model_dump(exclude={"artist_ids", "artist_roles", "composer_ids", "mood_ids"})
     song = models.Song(**song_fields)
     db.add(song)
     db.flush()  # get song.id without committing
@@ -167,7 +181,7 @@ def update_song(song_id: UUID, data: schemas.SongUpdate, db: Session = Depends(g
         raise HTTPException(404, "Song not found")
     scalar_fields = data.model_dump(
         exclude_unset=True,
-        exclude={"artist_ids", "artist_roles", "composer_ids", "genre_ids", "mood_ids"}
+        exclude={"artist_ids", "artist_roles", "composer_ids", "mood_ids"}
     )
     for k, v in scalar_fields.items():
         setattr(song, k, v)
