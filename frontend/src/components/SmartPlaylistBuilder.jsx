@@ -5,7 +5,9 @@ import { previewSmartPlaylist, createSmartPlaylist, updateSmartPlaylist } from '
 const FIELDS = [
   { value: 'artist',          labelKey: 'smartPlaylist.fields.artist',        type: 'string' },
   { value: 'album',           labelKey: 'smartPlaylist.fields.album',         type: 'string' },
-  { value: 'genre',           labelKey: 'smartPlaylist.fields.genre',         type: 'string' },
+  { value: 'primary_genre',   label: 'Género principal',                      type: 'string' },
+  { value: 'subgenre',        label: 'Subgénero',                             type: 'string' },
+  { value: 'vocal_type',      label: 'Tipo vocal',                            type: 'vocal_type' },
   { value: 'mood',            labelKey: 'smartPlaylist.fields.mood',          type: 'string' },
   { value: 'year',            labelKey: 'smartPlaylist.fields.year',          type: 'int' },
   { value: 'availability',    labelKey: 'smartPlaylist.fields.availability',  type: 'availability' },
@@ -31,9 +33,15 @@ const INT_OPS = [
   { value: 'between', labelKey: 'smartPlaylist.ops.between' },
 ]
 
+const VOCAL_TYPE_OPS = [
+  { value: 'is',     labelKey: 'smartPlaylist.ops.is' },
+  { value: 'is_not', labelKey: 'smartPlaylist.ops.isNot' },
+]
+
 function getOpsForType(type) {
   if (type === 'string') return STRING_OPS
   if (type === 'int' || type === 'rating') return INT_OPS
+  if (type === 'vocal_type') return VOCAL_TYPE_OPS
   return []
 }
 
@@ -50,6 +58,7 @@ function ConditionRow({ cond, onChange, onRemove, t }) {
     const newOp = getOpsForType(newDef.type)[0]?.value || 'is'
     const newValue = newDef.type === 'bool' ? true
       : newDef.type === 'availability' ? 'available'
+      : newDef.type === 'vocal_type' ? 'vocal'
       : newDef.type === 'int' || newDef.type === 'rating' ? 0
       : ''
     onChange({ field: newField, op: newOp, value: newValue })
@@ -127,6 +136,16 @@ function ConditionRow({ cond, onChange, onRemove, t }) {
         </div>
       )
     }
+    if (fieldDef.type === 'vocal_type') {
+      return (
+        <select value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })}
+          className="flex-1 px-3 py-1.5 bg-[#1e1e30] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500">
+          <option value="vocal">Vocal</option>
+          <option value="instrumental">Instrumental</option>
+          <option value="a_capella">A capella</option>
+        </select>
+      )
+    }
     return null
   }
 
@@ -134,7 +153,11 @@ function ConditionRow({ cond, onChange, onRemove, t }) {
     <div className="flex items-center gap-2 mb-2">
       <select value={cond.field} onChange={e => handleFieldChange(e.target.value)}
         className="w-36 px-2 py-1.5 bg-[#1e1e30] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500">
-        {FIELDS.map(f => <option key={f.value} value={f.value}>{t(f.labelKey)}</option>)}
+        {FIELDS.map(f => (
+          <option key={f.value} value={f.value}>
+            {f.label || t(f.labelKey)}
+          </option>
+        ))}
       </select>
 
       {ops.length > 0 && (
