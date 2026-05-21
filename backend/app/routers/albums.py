@@ -65,7 +65,6 @@ def get_album(album_id: UUID, db: Session = Depends(get_db)):
             selectinload(models.Album.artist),
             selectinload(models.Album.songs).selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist),
             selectinload(models.Album.songs).selectinload(models.Song.song_composers).selectinload(models.SongComposer.artist),
-            selectinload(models.Album.songs).selectinload(models.Song.song_genres).selectinload(models.SongGenre.genre),
             selectinload(models.Album.songs).selectinload(models.Song.song_moods).selectinload(models.SongMood.mood),
         )
         .filter(models.Album.id == album_id)

@@ -241,7 +241,6 @@ def enrich_song(song_id: UUID, db: Session = Depends(get_db)):
         .options(
             selectinload(models.Song.song_artists).selectinload(models.SongArtist.artist),
             selectinload(models.Song.song_composers).selectinload(models.SongComposer.artist),
-            selectinload(models.Song.song_genres).selectinload(models.SongGenre.genre),
             selectinload(models.Song.song_moods).selectinload(models.SongMood.mood),
             selectinload(models.Song.album).selectinload(models.Album.artist),
         )
