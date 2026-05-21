@@ -29,3 +29,6 @@ export const downloadLyrics = (id, format) =>
 
 export const setSongRating  = (id, rating) => api.patch(`/songs/${id}/rating`, { rating }).then(r => r.data)
 export const toggleSongFavorite = (id) => api.patch(`/songs/${id}/favorite`).then(r => r.data)
+
+export const getGenresUsed    = () => api.get('/songs/genres-used').then(r => r.data)
+export const getSubgenresUsed = () => api.get('/songs/subgenres-used').then(r => r.data)
