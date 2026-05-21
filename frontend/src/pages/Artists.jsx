@@ -74,7 +74,7 @@ export default function Artists() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
-  const [viewMode, setViewMode] = useState('grid') // 'grid' | 'list'
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('artists-view') || 'grid')
   const limit = 48
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -124,14 +124,14 @@ export default function Artists() {
           className="w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500" />
         {total > 0 && <span className="text-[#94a3b8] text-sm">{total} {t('artists.count')}</span>}
         <div className="ml-auto flex gap-1 border border-[#2e2e4a] rounded-lg p-0.5">
-          <button onClick={() => setViewMode('grid')}
+          <button onClick={() => { setViewMode('grid'); localStorage.setItem('artists-view', 'grid') }}
             className={`px-2.5 py-1.5 rounded-md text-sm transition-colors ${viewMode === 'grid' ? 'bg-[#22223a] text-white' : 'text-[#94a3b8] hover:text-white'}`}
             title="Vista en cuadrícula">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 3h7v7H3zm0 11h7v7H3zm11-11h7v7h-7zm0 11h7v7h-7z"/>
             </svg>
           </button>
-          <button onClick={() => setViewMode('list')}
+          <button onClick={() => { setViewMode('list'); localStorage.setItem('artists-view', 'list') }}
             className={`px-2.5 py-1.5 rounded-md text-sm transition-colors ${viewMode === 'list' ? 'bg-[#22223a] text-white' : 'text-[#94a3b8] hover:text-white'}`}
             title="Vista en lista">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

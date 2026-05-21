@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { getSongs, createSong, updateSong, deleteSong, enrichSong, batchDelete, batchAvailability, batchDeleteAll, setSongRating, toggleSongFavorite } from '../api/songs'
 import { getArtists, createArtist } from '../api/artists'
 import { getAlbums } from '../api/albums'
-import { getGenres } from '../api/genres'
 import { getMoods } from '../api/moods'
 import { getPlaylists, addSongsToPlaylist } from '../api/playlists'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -11,6 +10,7 @@ import EmptyState from '../components/EmptyState'
 import LyricsModal from '../components/LyricsModal'
 import ErrorState from '../components/ErrorState'
 import RatingStars from '../components/RatingStars'
+import SongEditModal from '../components/SongEditModal'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -133,10 +133,8 @@ function SongModal({ initial, onClose, onSaved }) {
     initial?.artists?.[0]?.artist || null
   )
   const [selectedAlbum, setSelectedAlbum] = useState(initial?.album || null)
-  const [genres, setGenres] = useState([])
   const [moods, setMoods] = useState([])
   const [albums, setAlbums] = useState([])
-  const [selGenres, setSelGenres] = useState(initial?.genres?.map(g => g.genre?.id ?? g.id) || [])
   const [selMoods, setSelMoods] = useState(initial?.moods?.map(m => m.mood?.id ?? m.id) || [])
   const [saving, setSaving] = useState(false)
   const isEdit = !!initial?.id
@@ -147,7 +145,6 @@ function SongModal({ initial, onClose, onSaved }) {
   )
 
   useEffect(() => {
-    getGenres().then(setGenres).catch(() => {})
     getMoods().then(setMoods).catch(() => {})
     if (selectedArtist) {
       getAlbums({ artist_id: selectedArtist.id, limit: 100 }).then(d => setAlbums(d.items)).catch(() => {})
@@ -170,7 +167,6 @@ function SongModal({ initial, onClose, onSaved }) {
         lyrics: form.lyrics || null,
         album_id: selectedAlbum?.id || null,
         artist_ids: [selectedArtist.id],
-        genre_ids: selGenres,
         mood_ids: selMoods,
       }
       if (isEdit) await updateSong(initial.id, payload)
@@ -239,7 +235,6 @@ function SongModal({ initial, onClose, onSaved }) {
             </div>
           </div>
 
-          <MultiSelect label="Géneros" options={genres} selected={selGenres} onChange={setSelGenres} />
           <MultiSelect label="Moods" options={moods} selected={selMoods} onChange={setSelMoods} />
 
           <div className="flex gap-3 justify-end pt-2">
@@ -315,11 +310,9 @@ export default function Library() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [availability, setAvailability] = useState('')
-  const [filterGenre, setFilterGenre] = useState('')
   const [filterMood, setFilterMood] = useState('')
   const [sortBy, setSortBy] = useState('title')
   const [sortDir, setSortDir] = useState('asc')
-  const [genres, setGenres] = useState([])
   const [moods, setMoods] = useState([])
   const limit = 20000
 
@@ -330,9 +323,9 @@ export default function Library() {
   const [selected, setSelected] = useState(new Set())
   const [batchLoading, setBatchLoading] = useState(false)
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
+  const [editSong, setEditSong] = useState(null)
 
   useEffect(() => {
-    getGenres().then(setGenres).catch(() => {})
     getMoods().then(setMoods).catch(() => {})
   }, [])
 
@@ -341,7 +334,6 @@ export default function Library() {
       setLoading(true); setError(null)
       const params = { search: search || undefined, page: 1, limit, sort_by: sortBy, sort_dir: sortDir }
       if (availability) params.availability = availability
-      if (filterGenre) params.genre_id = filterGenre
       if (filterMood) params.mood_id = filterMood
       const data = await getSongs(params)
       setSongs(data.items); setTotal(data.total)
@@ -349,7 +341,7 @@ export default function Library() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [search, availability, filterGenre, filterMood, sortBy, sortDir])
+  useEffect(() => { load() }, [search, availability, filterMood, sortBy, sortDir])
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta canción?')) return
@@ -482,11 +474,6 @@ export default function Library() {
           onChange={e => setSearch(e.target.value)}
           className="w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
         />
-        <select value={filterGenre} onChange={e => setFilterGenre(e.target.value)}
-          className="px-3 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500">
-          <option value="">Todos los géneros</option>
-          {genres.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-        </select>
         <select value={filterMood} onChange={e => setFilterMood(e.target.value)}
           className="px-3 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500">
           <option value="">Todos los moods</option>
@@ -602,6 +589,11 @@ export default function Library() {
                           title="Agregar a playlist">
                           + Lista
                         </button>
+                        <button onClick={() => setEditSong(song)}
+                          className="text-teal-400/70 hover:text-teal-400 text-xs font-medium transition-colors"
+                          title="Editar género y tipo vocal">
+                          ♬
+                        </button>
                         <button onClick={() => setLyricsModal(song)}
                           className="text-yellow-400/70 hover:text-yellow-400 text-xs font-medium transition-colors"
                           title={t('lyrics.title')}>
@@ -649,6 +641,13 @@ export default function Library() {
 
       {lyricsModal && (
         <LyricsModal song={lyricsModal} onClose={() => setLyricsModal(null)} />
+      )}
+
+      {editSong && (
+        <SongEditModal song={editSong} onClose={() => setEditSong(null)} onSaved={(updated) => {
+          setSongs(prev => prev.map(s => s.id === updated.id ? updated : s))
+          setEditSong(null)
+        }} />
       )}
 
       {showDeleteAllConfirm && (

@@ -5,6 +5,7 @@ import { setSongRating, toggleSongFavorite } from '../api/songs'
 import RatingStars from '../components/RatingStars'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorState from '../components/ErrorState'
+import SongEditModal from '../components/SongEditModal'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -23,6 +24,7 @@ export default function AlbumDetail() {
   const [savingCover, setSavingCover] = useState(false)
   const [searchingCover, setSearchingCover] = useState(false)
   const [coverCandidates, setCoverCandidates] = useState([])
+  const [editSong, setEditSong] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -136,6 +138,7 @@ export default function AlbumDetail() {
                 <th className="px-4 py-3 text-right">Duración</th>
                 <th className="px-3 py-3" />
                 <th className="px-3 py-3 w-8" />
+                <th className="px-2 py-3 w-8" />
               </tr>
             </thead>
             <tbody>
@@ -170,6 +173,13 @@ export default function AlbumDetail() {
                       className={`text-lg transition-colors ${song.is_favorite ? 'text-pink-500' : 'text-[#3d3d5c] hover:text-pink-400'}`}
                     >
                       {song.is_favorite ? '♥' : '♡'}
+                    </button>
+                  </td>
+                  <td className="px-2 py-2.5">
+                    <button onClick={() => setEditSong(song)}
+                      className="text-[#3d3d5c] hover:text-teal-400 transition-colors opacity-0 group-hover:opacity-100 text-sm"
+                      title="Editar género y tipo vocal">
+                      ♬
                     </button>
                   </td>
                 </tr>
@@ -219,9 +229,16 @@ export default function AlbumDetail() {
         )
       })()}
 
+      {editSong && (
+        <SongEditModal song={editSong} onClose={() => setEditSong(null)} onSaved={(updated) => {
+          setSongs(prev => prev.map(s => s.id === updated.id ? updated : s))
+          setEditSong(null)
+        }} />
+      )}
+
       {coverModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setCoverModal(false)}>
-          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg h-[600px] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg h-[480px] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4">Portada del álbum</h2>
 
             {/* Buscar opciones */}

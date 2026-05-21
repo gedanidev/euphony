@@ -7,6 +7,7 @@ import { setSongRating, toggleSongFavorite } from '../api/songs'
 import RatingStars from '../components/RatingStars'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorState from '../components/ErrorState'
+import SongEditModal from '../components/SongEditModal'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -22,7 +23,7 @@ function AlbumIcon({ className }) {
   )
 }
 
-function SongRow({ song, idx, onRating, onFavorite }) {
+function SongRow({ song, idx, onRating, onFavorite, onEdit }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
     <tr className="border-b border-[#2e2e4a] last:border-0 hover:bg-[#22223a]/40 text-sm group">
@@ -58,9 +59,11 @@ function SongRow({ song, idx, onRating, onFavorite }) {
         {menuOpen && (
           <div className="absolute right-0 top-full z-20 mt-1 w-44 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg shadow-xl overflow-hidden"
             onMouseLeave={() => setMenuOpen(false)}>
-            <div className="px-3 py-2 text-xs text-[#64748b] border-b border-[#2e2e4a]">Próximamente</div>
-            <button className="w-full text-left px-3 py-2 text-sm text-[#94a3b8] hover:bg-[#22223a] transition-colors">
-              Agregar a playlist…
+            <button
+              onClick={() => { setMenuOpen(false); onEdit(song) }}
+              className="w-full text-left px-3 py-2 text-sm text-[#94a3b8] hover:bg-[#22223a] hover:text-white transition-colors"
+            >
+              Editar género / tipo vocal
             </button>
           </div>
         )}
@@ -97,6 +100,7 @@ export default function ArtistDetail() {
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [showAddRelation, setShowAddRelation] = useState(false)
+  const [editSong, setEditSong] = useState(null)
 
   const load = async () => {
     try {
@@ -306,7 +310,7 @@ export default function ArtistDetail() {
                     <tbody>
                       {albumSongs.map((song, idx) => (
                         <SongRow key={song.id} song={song} idx={idx}
-                          onRating={handleSongRating} onFavorite={handleSongFavorite} />
+                          onRating={handleSongRating} onFavorite={handleSongFavorite} onEdit={setEditSong} />
                       ))}
                     </tbody>
                   </table>
@@ -364,7 +368,7 @@ export default function ArtistDetail() {
                         : songs
                       ).slice(0, 10).map((song, idx) => (
                         <SongRow key={song.id} song={song} idx={idx}
-                          onRating={handleSongRating} onFavorite={handleSongFavorite} />
+                          onRating={handleSongRating} onFavorite={handleSongFavorite} onEdit={setEditSong} />
                       ))}
                     </tbody>
                   </table>
@@ -451,7 +455,7 @@ export default function ArtistDetail() {
 
       {imageModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setImageModal(false)}>
-          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg h-[600px] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-lg h-[480px] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4">Imagen del artista</h2>
 
             <div className="flex gap-2 mb-4">
@@ -547,6 +551,17 @@ export default function ArtistDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {editSong && (
+        <SongEditModal
+          song={editSong}
+          onClose={() => setEditSong(null)}
+          onSaved={(updated) => {
+            setSongs(prev => prev.map(s => s.id === updated.id ? updated : s))
+            setEditSong(null)
+          }}
+        />
       )}
     </div>
   )
