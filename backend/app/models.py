@@ -62,15 +62,6 @@ class Album(Base):
     songs = relationship("Song", back_populates="album")
 
 
-class Genre(Base):
-    __tablename__ = "genres"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(100), nullable=False, unique=True)
-
-    song_genres = relationship("SongGenre", back_populates="genre", cascade="all, delete-orphan")
-
-
 class Mood(Base):
     __tablename__ = "moods"
 
@@ -103,6 +94,9 @@ class Song(Base):
     spotify_id = Column(String(100))
     rating = Column(Integer, nullable=True)
     is_favorite = Column(Boolean, nullable=False, default=False)
+    primary_genre = Column(String(100), nullable=True)
+    subgenres = Column(JSONB, nullable=False, default=list, server_default='[]')
+    vocal_type = Column(String(20), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -111,7 +105,6 @@ class Song(Base):
     covers = relationship("Song", foreign_keys=[original_song_id], back_populates="original_song")
     song_artists = relationship("SongArtist", back_populates="song", cascade="all, delete-orphan", order_by="SongArtist.order")
     song_composers = relationship("SongComposer", back_populates="song", cascade="all, delete-orphan", order_by="SongComposer.order")
-    song_genres = relationship("SongGenre", back_populates="song", cascade="all, delete-orphan")
     song_moods = relationship("SongMood", back_populates="song", cascade="all, delete-orphan")
     playlist_songs = relationship("PlaylistSong", back_populates="song", cascade="all, delete-orphan")
     listen_history = relationship("ListenHistory", back_populates="song", cascade="all, delete-orphan")
@@ -156,16 +149,6 @@ class ArtistRelation(Base):
 
     artist1 = relationship("Artist", foreign_keys=[artist1_id], back_populates="relations_as_artist1")
     artist2 = relationship("Artist", foreign_keys=[artist2_id], back_populates="relations_as_artist2")
-
-
-class SongGenre(Base):
-    __tablename__ = "song_genres"
-
-    song_id = Column(UUID(as_uuid=True), ForeignKey("songs.id", ondelete="CASCADE"), primary_key=True)
-    genre_id = Column(UUID(as_uuid=True), ForeignKey("genres.id", ondelete="CASCADE"), primary_key=True)
-
-    song = relationship("Song", back_populates="song_genres")
-    genre = relationship("Genre", back_populates="song_genres")
 
 
 class SongMood(Base):
