@@ -7,20 +7,6 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 # ---------------------------------------------------------------------------
-# Genre
-# ---------------------------------------------------------------------------
-
-class GenreCreate(BaseModel):
-    name: str
-
-class GenreRead(BaseModel):
-    id: UUID
-    name: str
-
-    model_config = {"from_attributes": True}
-
-
-# ---------------------------------------------------------------------------
 # Mood
 # ---------------------------------------------------------------------------
 
@@ -128,11 +114,6 @@ class SongArtistRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
-class SongGenreRead(BaseModel):
-    genre: GenreRead
-
-    model_config = {"from_attributes": True}
-
 class SongMoodRead(BaseModel):
     mood: MoodRead
 
@@ -159,13 +140,15 @@ class SongBase(BaseModel):
     spotify_id: Optional[str] = None
     rating: Optional[int] = None
     is_favorite: bool = False
+    primary_genre: Optional[str] = None
+    subgenres: List[str] = []
+    vocal_type: Optional[str] = None
 
 class SongCreate(SongBase):
     # First artist in list becomes principal unless artist_roles overrides
     artist_ids: List[UUID]
     artist_roles: Optional[List[dict]] = None  # [{"artist_id": "...", "role": "colaborador"}]
     composer_ids: Optional[List[UUID]] = None
-    genre_ids: Optional[List[UUID]] = None
     mood_ids: Optional[List[UUID]] = None
 
 class SongUpdate(BaseModel):
@@ -183,10 +166,12 @@ class SongUpdate(BaseModel):
     spotify_id: Optional[str] = None
     rating: Optional[int] = None
     is_favorite: Optional[bool] = None
+    primary_genre: Optional[str] = None
+    subgenres: Optional[List[str]] = None
+    vocal_type: Optional[str] = None
     artist_ids: Optional[List[UUID]] = None
     artist_roles: Optional[List[dict]] = None
     composer_ids: Optional[List[UUID]] = None
-    genre_ids: Optional[List[UUID]] = None
     mood_ids: Optional[List[UUID]] = None
 
 class SongRead(SongBase):
@@ -195,7 +180,6 @@ class SongRead(SongBase):
     updated_at: Optional[datetime] = None
     artists: List[SongArtistRead] = Field(default=[], validation_alias="song_artists")
     composers: List[SongComposerRead] = Field(default=[], validation_alias="song_composers")
-    genres: List[SongGenreRead] = Field(default=[], validation_alias="song_genres")
     moods: List[SongMoodRead] = Field(default=[], validation_alias="song_moods")
     album: Optional[AlbumRead] = None
 
@@ -412,7 +396,7 @@ class ResetPasswordRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 class SmartPlaylistCondition(BaseModel):
-    field: str   # "artist", "album", "genre", "mood", "year", "availability", "rating", "is_favorite", "artist_preferred"
+    field: str   # "artist", "album", "primary_genre", "subgenre", "vocal_type", "mood", "year", "availability", "rating", "is_favorite", "artist_preferred"
     op: str      # "contains", "not_contains", "is", "is_not", "starts_with", "ends_with", "gt", "lt", "between"
     value: Any   # str, int, bool, or list of two ints for "between"
 
