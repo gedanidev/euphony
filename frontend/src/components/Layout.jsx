@@ -9,15 +9,15 @@ function NavItem({ to, icon, label, onClick }) {
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+        `flex items-center gap-3 px-3 py-3 rounded-lg text-sm transition-colors min-h-[48px] touch-target ${
           isActive
             ? 'bg-purple-700/30 text-purple-300 font-medium'
-            : 'text-[#94a3b8] hover:bg-[#22223a] hover:text-[#e2e8f0]'
+            : 'text-[#e0e0e0] hover:bg-[#22223a] hover:text-white'
         }`
       }
     >
-      {icon}
-      {label}
+      <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">{icon}</span>
+      <span className="truncate">{label}</span>
     </NavLink>
   )
 }
@@ -76,13 +76,13 @@ export default function Layout({ children }) {
       } />
 
       <NavItem to="/spotify-history" label={t('nav.spotifyHistory')} onClick={closeSidebar} icon={
-        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
         </svg>
       } />
 
-      <div className="pt-3 pb-1">
-        <p className="px-3 text-xs text-[#2e2e4a] uppercase tracking-wider font-medium">{t('nav.tools')}</p>
+      <div className="mt-4 pt-4 border-t border-[#2e2e4a]">
+        <p className="px-3 text-xs text-[#64748b] uppercase tracking-wider font-semibold mb-2">{t('nav.tools')}</p>
       </div>
       <NavItem to="/import" label={t('nav.import')} onClick={closeSidebar} icon={
         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,24 +107,24 @@ export default function Layout({ children }) {
       <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#1a1a24] border-b border-[#2e2e4a] flex-shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <button
           onClick={() => setSidebarOpen(true)}
-          className="p-1.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-[#e2e8f0] transition-colors"
+          className="p-2.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-[#e2e8f0] transition-colors touch-target"
           aria-label="Open menu"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
 
-        <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">
+        <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">
           Euphony
         </span>
 
         <button
           onClick={handleLogout}
-          className="p-1.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-red-400 transition-colors"
+          className="p-2.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-red-400 transition-colors touch-target"
           aria-label={t('auth.logout')}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
@@ -152,9 +152,10 @@ export default function Layout({ children }) {
           </span>
           <button
             onClick={closeSidebar}
-            className="lg:hidden p-1 rounded text-[#94a3b8] hover:text-[#e2e8f0]"
+            className="lg:hidden p-2.5 rounded-lg text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#22223a] transition-colors touch-target"
+            aria-label="Close menu"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -164,12 +165,16 @@ export default function Layout({ children }) {
           {navItems}
         </nav>
 
-        <div className="p-4 border-t border-[#2e2e4a] space-y-2">
-          <p className="text-xs text-[#94a3b8]">Euphony {t('common.version')}</p>
+        <div className="p-4 border-t border-[#2e2e4a] space-y-3">
+          <p className="text-xs text-[#64748b] px-1">Euphony {t('common.version')}</p>
           <button
             onClick={handleLogout}
-            className="w-full text-left text-xs text-[#94a3b8] hover:text-red-400 transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-[#e0e0e0] hover:text-red-400 hover:bg-red-900/20 transition-colors min-h-[48px] touch-target"
           >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
             {t('auth.logout')}
           </button>
         </div>

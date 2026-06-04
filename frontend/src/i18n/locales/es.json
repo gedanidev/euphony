@@ -145,8 +145,10 @@
   "auth.email": "Correo electrónico",
   "auth.password": "Contraseña",
   "auth.loginBtn": "Entrar",
-  "auth.loggingIn": "Entrando…",
+  "auth.loggingIn": "Entrando...",
   "auth.forgotPassword": "¿Olvidaste tu contraseña?",
+  "auth.showPassword": "Mostrar contraseña",
+  "auth.hidePassword": "Ocultar contraseña",
   "auth.forgotTitle": "Recuperar contraseña",
   "auth.forgotDesc": "Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.",
   "auth.sendLink": "Enviar enlace",
@@ -210,5 +212,32 @@
   "artist.preferred": "Preferido",
   "common.yes": "Sí",
   "common.no": "No",
-  "common.name": "Nombre"
+  "common.name": "Nombre",
+
+  "toast.success": "Éxito",
+  "toast.error": "Error",
+  "toast.warning": "Advertencia",
+  "toast.info": "Información",
+  "toast.dismiss": "Cerrar",
+
+  "error.generic": "Ocurrió un error. Intenta nuevamente.",
+  "error.loading": "Error al cargar los datos",
+  "error.saving": "Error al guardar",
+  "error.deleting": "Error al eliminar",
+
+  "table.noData": "No hay datos",
+  "table.loading": "Cargando...",
+
+  "actions.edit": "Editar",
+  "actions.delete": "Eliminar",
+  "actions.cancel": "Cancelar",
+  "actions.save": "Guardar",
+  "actions.add": "Agregar",
+  "actions.search": "Buscar",
+  "actions.filter": "Filtrar",
+  "actions.sort": "Ordenar",
+  "actions.close": "Cerrar",
+  "actions.confirm": "Confirmar",
+
+  "mobile.swipeHint": "Desliza para más acciones"
 }

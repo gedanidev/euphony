@@ -141,12 +141,14 @@
   "common.next": "Next →",
   "common.songs": "songs",
   "common.version": "v0.2",
-  "auth.login": "Sign in",
+  "auth.login": "Log in",
   "auth.email": "Email",
   "auth.password": "Password",
-  "auth.loginBtn": "Sign in",
-  "auth.loggingIn": "Signing in…",
-  "auth.forgotPassword": "Forgot your password?",
+  "auth.loginBtn": "Log in",
+  "auth.loggingIn": "Logging in...",
+  "auth.forgotPassword": "Forgot password?",
+  "auth.showPassword": "Show password",
+  "auth.hidePassword": "Hide password",
   "auth.forgotTitle": "Reset password",
   "auth.forgotDesc": "Enter your email and we'll send you a reset link.",
   "auth.sendLink": "Send link",
@@ -210,5 +212,32 @@
   "artist.preferred": "Preferred",
   "common.yes": "Yes",
   "common.no": "No",
-  "common.name": "Name"
+  "common.name": "Name",
+
+  "toast.success": "Success",
+  "toast.error": "Error",
+  "toast.warning": "Warning",
+  "toast.info": "Info",
+  "toast.dismiss": "Dismiss",
+
+  "error.generic": "An error occurred. Please try again.",
+  "error.loading": "Error loading data",
+  "error.saving": "Error saving",
+  "error.deleting": "Error deleting",
+
+  "table.noData": "No data",
+  "table.loading": "Loading...",
+
+  "actions.edit": "Edit",
+  "actions.delete": "Delete",
+  "actions.cancel": "Cancel",
+  "actions.save": "Save",
+  "actions.add": "Add",
+  "actions.search": "Search",
+  "actions.filter": "Filter",
+  "actions.sort": "Sort",
+  "actions.close": "Close",
+  "actions.confirm": "Confirm",
+
+  "mobile.swipeHint": "Swipe for more actions"
 }

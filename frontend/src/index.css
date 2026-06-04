@@ -25,6 +25,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -38,4 +39,249 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #7c3aed;
+}
+
+/* Smooth scrolling for the main content */
+main {
+  scroll-behavior: smooth;
+}
+
+/* ==========================================================================
+   Responsive Table Styles
+   Mobile-first table that converts to cards on small screens
+   ========================================================================== */
+
+@layer components {
+  /* Base table styles */
+  .euphony-table {
+    @apply w-full text-left border-collapse;
+  }
+
+  /* Table header */
+  .euphony-table thead {
+    @apply hidden lg:table-header-group;
+  }
+
+  .euphony-table th {
+    @apply px-4 py-3 text-xs font-semibold text-[#94a3b8] uppercase tracking-wider bg-[#1a1a24];
+  }
+
+  /* Table body - on mobile, each row becomes a card */
+  .euphony-table tbody {
+    @apply block lg:table-row-group;
+  }
+
+  .euphony-table tr {
+    @apply block mb-3 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg overflow-hidden
+           lg:table-row lg:mb-0 lg:bg-transparent lg:border-0 lg:border-b lg:border-[#2e2e4a]/50 lg:rounded-none
+           hover:lg:bg-[#1a1a24]/50 transition-colors;
+  }
+
+  /* Table cells - on mobile, each cell becomes a row */
+  .euphony-table td {
+    @apply block px-4 py-3 text-sm text-[#e2e8f0] border-b border-[#2e2e4a]/30
+           lg:table-cell lg:px-4 lg:py-3 lg:border-0;
+  }
+
+  /* Last row/cell borders */
+  .euphony-table tbody tr:last-child {
+    @apply lg:border-b-0;
+  }
+
+  .euphony-table td:last-child {
+    @apply border-b-0;
+  }
+
+  /* Mobile cell labels using data-label attribute */
+  .euphony-table td[data-label]:before {
+    content: attr(data-label) ": ";
+    @apply inline-block font-medium text-[#94a3b8] text-xs uppercase tracking-wider mb-1 mr-2
+           lg:hidden;
+  }
+
+  /* Compact table variant (for smaller spaces) */
+  .euphony-table--compact td {
+    @apply lg:px-3 lg:py-2;
+  }
+
+  /* Table with actions */
+  .euphony-table .actions-cell {
+    @apply flex items-center gap-2 justify-end pt-2 lg:pt-3;
+  }
+}
+
+/* ==========================================================================
+   Mobile Touch Improvements
+   ========================================================================== */
+
+@layer components {
+  /* Touch-friendly buttons - minimum 44x44px */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
+  }
+
+  /* Touch-friendly inputs */
+  .touch-input {
+    @apply min-h-[44px] text-base;
+  }
+
+  /* Ripple effect for touch feedback */
+  .touch-ripple {
+    @apply relative overflow-hidden;
+  }
+
+  .touch-ripple:active::after {
+    content: '';
+    @apply absolute inset-0 bg-white/10 rounded-lg;
+  }
+}
+
+/* ==========================================================================
+   Animation Utilities
+   ========================================================================== */
+
+@layer utilities {
+  /* Fade in animation */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Slide up animation for modals */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  /* Scale animation for interactive elements */
+  .animate-scale-in {
+    animation: scaleIn 0.15s ease-out;
+  }
+
+  /* Stagger animation helper */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   Interactive States
+   ========================================================================== */
+
+@layer utilities {
+  /* Focus ring for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f0f13];
+  }
+
+  /* Press/active state for buttons */
+  .pressable {
+    @apply active:scale-[0.98] transition-transform duration-75;
+  }
+
+  /* Hover states that only apply on hover-capable devices */
+  @media (hover: hover) and (pointer: fine) {
+    .hover-lift:hover {
+      @apply -translate-y-0.5;
+    }
+  }
+}
+
+/* ==========================================================================
+   Safe Area Support (Notch devices)
+   ========================================================================== */
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ==========================================================================
+   Modal/Dialog Improvements
+   ========================================================================== */
+
+@layer components {
+  /* Modal backdrop blur */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
+  }
+
+  /* Modal content mobile-safe */
+  .modal-content {
+    @apply fixed z-50 w-full max-w-lg mx-auto bg-[#1a1a24] rounded-t-xl sm:rounded-xl 
+           max-h-[90dvh] overflow-y-auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+
+  @screen sm {
+    .modal-content {
+      @apply relative rounded-xl;
+      bottom: auto;
+      left: 50%;
+      right: auto;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* ==========================================================================
+   Selection Styling
+   ========================================================================== */
+
+::selection {
+  @apply bg-purple-500/30 text-white;
+}
+
+/* ==========================================================================
+   Reduced Motion Support
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

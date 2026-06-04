@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 const API = import.meta.env.VITE_API_URL || '/api'
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_CF_TURNSTILE_SITE_KEY || ''
@@ -13,6 +14,7 @@ export default function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const widgetRef = useRef(null)
@@ -85,26 +87,42 @@ export default function Login() {
             </p>
           )}
 
-          <div className="space-y-1">
-            <label className="text-xs text-[#94a3b8]">{t('auth.email')}</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full bg-[#0f0f13] border border-[#2e2e4a] rounded-lg px-3 py-2 text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500"
-            />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[#E0E0E0]">{t('auth.email')}</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full bg-[#0f0f13] border border-[#3e3e5a] rounded-lg pl-10 pr-3 py-3 text-base text-[#e2e8f0] placeholder:text-[#64748b] focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all min-h-[48px]"
+                placeholder="email@ejemplo.com"
+              />
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs text-[#94a3b8]">{t('auth.password')}</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full bg-[#0f0f13] border border-[#2e2e4a] rounded-lg px-3 py-2 text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500"
-            />
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[#E0E0E0]">{t('auth.password')}</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#94a3b8]" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full bg-[#0f0f13] border border-[#3e3e5a] rounded-lg pl-10 pr-12 py-3 text-base text-[#e2e8f0] placeholder:text-[#64748b] focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all min-h-[48px]"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-[#94a3b8] hover:text-[#e2e8f0] transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500/30 rounded"
+                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
 
           <div ref={mountTurnstile} />
@@ -112,15 +130,22 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-medium py-2 px-4 rounded-lg text-sm transition-colors"
+            className="w-full bg-purple-600 hover:bg-purple-700 active:bg-purple-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3.5 px-4 rounded-lg text-base transition-all min-h-[48px] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
           >
-            {loading ? t('auth.loggingIn') : t('auth.loginBtn')}
+            {loading ? (
+              <>
+                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                {t('auth.loggingIn')}
+              </>
+            ) : (
+              t('auth.loginBtn')
+            )}
           </button>
 
-          <div className="text-center">
+          <div className="text-center pt-2">
             <Link
               to="/forgot-password"
-              className="text-xs text-[#94a3b8] hover:text-purple-400 transition-colors"
+              className="text-sm text-[#94a3b8] hover:text-purple-400 transition-colors inline-block py-2 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/30 rounded"
             >
               {t('auth.forgotPassword')}
             </Link>
