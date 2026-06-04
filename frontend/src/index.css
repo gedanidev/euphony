@@ -12,6 +12,13 @@ html, body, #root {
   box-sizing: border-box;
 }
 
+/* Prevent iOS Safari auto-zoom on input focus (triggered when font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
 body {
   background-color: #0f0f13;
   color: #e2e8f0;

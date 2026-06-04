@@ -104,7 +104,7 @@ export default function Layout({ children }) {
     <div className="flex flex-col h-dvh bg-[#0f0f13] text-[#e2e8f0] overflow-hidden lg:flex-row">
 
       {/* Mobile header */}
-      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#1a1a24] border-b border-[#2e2e4a] flex-shrink-0">
+      <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-[#1a1a24] border-b border-[#2e2e4a] flex-shrink-0" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-1.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-[#e2e8f0] transition-colors"
