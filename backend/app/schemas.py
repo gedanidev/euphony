@@ -143,6 +143,12 @@ class SongBase(BaseModel):
     primary_genre: Optional[str] = None
     subgenres: List[str] = []
     vocal_type: Optional[str] = None
+    walkman_status: Optional[str] = None
+    walkman_path: Optional[str] = None
+    walkman_play_count: Optional[int] = None
+    walkman_skip_count: Optional[int] = None
+    walkman_size: Optional[int] = None
+    wishlist_notes: Optional[str] = None
 
 class SongCreate(SongBase):
     # First artist in list becomes principal unless artist_roles overrides
@@ -169,6 +175,12 @@ class SongUpdate(BaseModel):
     primary_genre: Optional[str] = None
     subgenres: Optional[List[str]] = None
     vocal_type: Optional[str] = None
+    walkman_status: Optional[str] = None
+    walkman_path: Optional[str] = None
+    walkman_play_count: Optional[int] = None
+    walkman_skip_count: Optional[int] = None
+    walkman_size: Optional[int] = None
+    wishlist_notes: Optional[str] = None
     artist_ids: Optional[List[UUID]] = None
     artist_roles: Optional[List[dict]] = None
     composer_ids: Optional[List[UUID]] = None
@@ -222,10 +234,19 @@ class PlaylistUpdate(BaseModel):
     description: Optional[str] = None
 
 class PlaylistSongRead(BaseModel):
+    id: UUID
     position: int
-    song: SongRead
+    song: Optional[SongRead] = None
+    raw_title: Optional[str] = None
+    raw_artist: Optional[str] = None
+    raw_path: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+    @computed_field
+    @property
+    def is_resolved(self) -> bool:
+        return self.song is not None
 
 class PlaylistRead(PlaylistBase):
     id: UUID
@@ -236,7 +257,7 @@ class PlaylistRead(PlaylistBase):
     model_config = {"from_attributes": True}
 
 class PlaylistDetailRead(PlaylistRead):
-    songs: List[PlaylistSongRead] = []
+    playlist_songs: List[PlaylistSongRead] = []
 
 
 # ---------------------------------------------------------------------------
@@ -427,3 +448,30 @@ class SmartPlaylistPreviewRequest(BaseModel):
 class SmartPlaylistPreviewResponse(BaseModel):
     song_count: int
     songs: List[SongRead] = []
+
+
+# ---------------------------------------------------------------------------
+# Walkman / Wishlist / Playlist import
+# ---------------------------------------------------------------------------
+
+class WalkmanSyncResult(BaseModel):
+    added: int
+    updated: int
+    wishlist_completed: int
+    removed: int
+    errors: List[str] = []
+
+
+class WishlistCreate(BaseModel):
+    title: str
+    artist_name: str
+    album_name: Optional[str] = None
+    wishlist_notes: Optional[str] = None
+
+
+class PlaylistImportResult(BaseModel):
+    playlist_id: UUID
+    playlist_name: str
+    total: int
+    matched: int
+    unresolved: int
