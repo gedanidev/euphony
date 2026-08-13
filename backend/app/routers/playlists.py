@@ -1,6 +1,7 @@
 import csv
 import io
-from fastapi import APIRouter, Depends, HTTPException, Query
+import re
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional
@@ -31,8 +32,44 @@ def _load_detail(playlist_id: UUID, db: Session) -> models.Playlist:
 
 def _to_detail(pl: models.Playlist) -> schemas.PlaylistDetailRead:
     result = schemas.PlaylistDetailRead.model_validate(pl)
-    result.song_count = len(pl.playlist_songs)
+    result.song_count = sum(1 for ps in pl.playlist_songs if ps.song_id is not None)
+    result.playlist_songs = [
+        schemas.PlaylistSongRead.model_validate(ps)
+        for ps in sorted(pl.playlist_songs, key=lambda x: x.position)
+    ]
     return result
+
+
+_EXTINF_RE = re.compile(r"^#EXTINF:\s*(-?\d+)\s*,\s*(.+)$")
+
+
+def _parse_m3u(content: str) -> list[dict]:
+    """Returns list of {title, artist, path} dicts."""
+    lines = content.splitlines()
+    entries = []
+    pending = None
+    for raw in lines:
+        line = raw.strip()
+        if not line or line == "#EXTM3U" or line.startswith("#PLAYLIST:"):
+            continue
+        if line.startswith("#EXTINF:"):
+            m = _EXTINF_RE.match(line)
+            if m:
+                display = m.group(2).strip()
+                if " - " in display:
+                    artist, title = display.split(" - ", 1)
+                else:
+                    artist, title = "", display
+                pending = {"title": title.strip(), "artist": artist.strip(), "path": ""}
+            continue
+        if not line.startswith("#"):
+            if pending is not None:
+                pending["path"] = line
+                entries.append(pending)
+                pending = None
+            else:
+                entries.append({"title": "", "artist": "", "path": line})
+    return entries
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
@@ -68,6 +105,74 @@ def create_playlist(data: schemas.PlaylistCreate, db: Session = Depends(get_db))
     result = schemas.PlaylistRead.model_validate(pl)
     result.song_count = 0
     return result
+
+
+@router.post("/import", response_model=schemas.PlaylistImportResult, status_code=201)
+async def import_playlist(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    content_bytes = await file.read()
+    filename = file.filename or "imported"
+    playlist_name = filename.rsplit(".", 1)[0]
+
+    content = content_bytes.decode("utf-8", errors="replace")
+    entries = _parse_m3u(content)
+
+    if not entries:
+        raise HTTPException(400, "No entries found in playlist file")
+
+    pl = models.Playlist(name=playlist_name)
+    db.add(pl)
+    db.flush()
+
+    matched = 0
+    unresolved = 0
+
+    for i, entry in enumerate(entries):
+        song = None
+
+        if entry["path"]:
+            song = db.query(models.Song).filter(
+                models.Song.walkman_path == entry["path"]
+            ).first()
+
+        if not song and entry["title"] and entry["artist"]:
+            song = (
+                db.query(models.Song)
+                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                .filter(
+                    models.Song.title.ilike(entry["title"]),
+                    models.Artist.name.ilike(entry["artist"]),
+                )
+                .first()
+            )
+
+        ps = models.PlaylistSong(
+            playlist_id=pl.id,
+            song_id=song.id if song else None,
+            position=i,
+            raw_title=entry["title"] or None,
+            raw_artist=entry["artist"] or None,
+            raw_path=entry["path"] or None,
+        )
+        db.add(ps)
+
+        if song:
+            matched += 1
+        else:
+            unresolved += 1
+
+    db.commit()
+
+    return schemas.PlaylistImportResult(
+        playlist_id=pl.id,
+        playlist_name=playlist_name,
+        total=len(entries),
+        matched=matched,
+        unresolved=unresolved,
+    )
 
 
 @router.get("/{playlist_id}", response_model=schemas.PlaylistDetailRead)
@@ -171,7 +276,7 @@ def export_playlist(
     if not pl:
         raise HTTPException(404, "Playlist not found")
 
-    songs = [ps.song for ps in sorted(pl.playlist_songs, key=lambda x: x.position)]
+    songs = [ps.song for ps in sorted(pl.playlist_songs, key=lambda x: x.position) if ps.song is not None]
 
     if format == "json":
         payload = {
@@ -197,13 +302,19 @@ def export_playlist(
 
     if format == "m3u":
         lines = ["#EXTM3U", f"#PLAYLIST:{pl.name}"]
+        skipped = 0
         for s in songs:
+            path = s.walkman_path or s.file_path
+            if not path:
+                skipped += 1
+                continue
             duration = s.duration if s.duration else -1
             artist = s.artist_display or ""
             title = s.title or ""
             lines.append(f"#EXTINF:{duration},{artist} - {title}")
-            # Use file_path if available, otherwise just the title as placeholder
-            lines.append(s.file_path or title)
+            lines.append(path)
+        if skipped:
+            lines.insert(1, f"# WARNING: {skipped} song(s) excluded (no Walkman path)")
         content = "\n".join(lines) + "\n"
         safe_name = "".join(c for c in pl.name if c.isalnum() or c in " -_").strip()
         return StreamingResponse(
