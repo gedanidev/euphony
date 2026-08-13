@@ -239,5 +239,41 @@
   "actions.close": "Cerrar",
   "actions.confirm": "Confirmar",
 
-  "mobile.swipeHint": "Desliza para más acciones"
+  "mobile.swipeHint": "Desliza para más acciones",
+
+  "walkman.sync": "Sincronizar Walkman",
+  "walkman.syncDesc": "Sube el archivo XML de backup del Walkman para actualizar tu librería.",
+  "walkman.selectFile": "Seleccionar archivo XML",
+  "walkman.clearUnlinked": "Primera vez: eliminar canciones sin ruta (borrar datos de prueba)",
+  "walkman.syncing": "Sincronizando...",
+  "walkman.syncDone": "Sincronización completada",
+  "walkman.added": "añadidas",
+  "walkman.updated": "actualizadas",
+  "walkman.removed": "marcadas como eliminadas",
+  "walkman.wishlistCompleted": "del wishlist conseguidas",
+  "walkman.errors": "errores",
+
+  "wishlist.title": "Wishlist",
+  "wishlist.empty": "No tienes canciones en el wishlist",
+  "wishlist.emptyDesc": "Agrega canciones que quieres conseguir para el Walkman",
+  "wishlist.add": "Agregar al wishlist",
+  "wishlist.addTitle": "Título",
+  "wishlist.addArtist": "Artista",
+  "wishlist.addAlbum": "Álbum (opcional)",
+  "wishlist.addNotes": "Notas (opcional)",
+  "wishlist.markAcquired": "Marcar como conseguida",
+  "wishlist.delete": "Eliminar",
+  "wishlist.pending": "pendientes",
+
+  "playlist.import": "Importar playlist",
+  "playlist.importDesc": "Sube un archivo M3U para crear una playlist vinculada a tu librería.",
+  "playlist.importDone": "Playlist importada",
+  "playlist.matched": "canciones vinculadas",
+  "playlist.unresolved": "no vinculadas",
+
+  "library.filterWalkman": "Estado Walkman",
+  "library.onWalkman": "En el Walkman",
+  "library.wishlist": "Wishlist",
+  "library.removed": "Eliminadas",
+  "library.allStatuses": "Todos"
 }

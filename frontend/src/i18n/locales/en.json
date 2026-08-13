@@ -239,5 +239,41 @@
   "actions.close": "Close",
   "actions.confirm": "Confirm",
 
-  "mobile.swipeHint": "Swipe for more actions"
+  "mobile.swipeHint": "Swipe for more actions",
+
+  "walkman.sync": "Sync Walkman",
+  "walkman.syncDesc": "Upload the Walkman XML backup file to update your library.",
+  "walkman.selectFile": "Select XML file",
+  "walkman.clearUnlinked": "First time: delete songs with no path (clear test data)",
+  "walkman.syncing": "Syncing...",
+  "walkman.syncDone": "Sync complete",
+  "walkman.added": "added",
+  "walkman.updated": "updated",
+  "walkman.removed": "marked as removed",
+  "walkman.wishlistCompleted": "wishlist items completed",
+  "walkman.errors": "errors",
+
+  "wishlist.title": "Wishlist",
+  "wishlist.empty": "Your wishlist is empty",
+  "wishlist.emptyDesc": "Add songs you want to get for your Walkman",
+  "wishlist.add": "Add to wishlist",
+  "wishlist.addTitle": "Title",
+  "wishlist.addArtist": "Artist",
+  "wishlist.addAlbum": "Album (optional)",
+  "wishlist.addNotes": "Notes (optional)",
+  "wishlist.markAcquired": "Mark as acquired",
+  "wishlist.delete": "Delete",
+  "wishlist.pending": "pending",
+
+  "playlist.import": "Import playlist",
+  "playlist.importDesc": "Upload an M3U file to create a playlist linked to your library.",
+  "playlist.importDone": "Playlist imported",
+  "playlist.matched": "songs linked",
+  "playlist.unresolved": "unlinked",
+
+  "library.filterWalkman": "Walkman status",
+  "library.onWalkman": "On Walkman",
+  "library.wishlist": "Wishlist",
+  "library.removed": "Removed",
+  "library.allStatuses": "All"
 }
