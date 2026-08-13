@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Integer, Text, DateTime, ForeignKey, UniqueConstraint, Boolean
+    Column, String, Integer, BigInteger, Text, DateTime, ForeignKey, UniqueConstraint, Boolean
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -97,6 +97,12 @@ class Song(Base):
     primary_genre = Column(String(100), nullable=True)
     subgenres = Column(JSONB, nullable=False, default=list, server_default='[]')
     vocal_type = Column(String(20), nullable=True)
+    walkman_status = Column(String(20), nullable=True)   # on_walkman | wishlist | removed
+    walkman_path = Column(String(500), nullable=True, index=True)
+    walkman_play_count = Column(Integer, nullable=True)
+    walkman_skip_count = Column(Integer, nullable=True)
+    walkman_size = Column(BigInteger, nullable=True)
+    wishlist_notes = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), default=_now)
     updated_at = Column(DateTime(timezone=True), default=_now, onupdate=_now)
 
@@ -220,12 +226,14 @@ class Playlist(Base):
 
 class PlaylistSong(Base):
     __tablename__ = "playlist_songs"
-    __table_args__ = (UniqueConstraint("playlist_id", "song_id", name="uq_playlist_song"),)
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     playlist_id = Column(UUID(as_uuid=True), ForeignKey("playlists.id", ondelete="CASCADE"), nullable=False)
-    song_id = Column(UUID(as_uuid=True), ForeignKey("songs.id", ondelete="CASCADE"), nullable=False)
+    song_id = Column(UUID(as_uuid=True), ForeignKey("songs.id", ondelete="CASCADE"), nullable=True)
     position = Column(Integer, nullable=False, default=0)
+    raw_title = Column(String(500), nullable=True)
+    raw_artist = Column(String(500), nullable=True)
+    raw_path = Column(String(500), nullable=True)
 
     playlist = relationship("Playlist", back_populates="playlist_songs")
     song = relationship("Song", back_populates="playlist_songs")
