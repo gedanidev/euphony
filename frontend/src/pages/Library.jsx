@@ -294,6 +294,65 @@ function AddToPlaylistModal({ songId, onClose }) {
   )
 }
 
+function BulkAddToPlaylistModal({ songIds, onClose, onSaved }) {
+  const [playlists, setPlaylists] = useState([])
+  const [newName, setNewName] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getPlaylists({ limit: 100 }).then(d => setPlaylists(d.items ?? d))
+  }, [])
+
+  const addToExisting = async (playlistId) => {
+    setSaving(true)
+    try {
+      await addSongsToPlaylist(playlistId, songIds)
+      onSaved()
+    } catch { alert('Error al agregar a playlist') }
+    finally { setSaving(false) }
+  }
+
+  const createAndAdd = async () => {
+    if (!newName.trim()) return
+    setSaving(true)
+    try {
+      const { createPlaylist: cp } = await import('../api/playlists')
+      const pl = await cp({ name: newName.trim() })
+      await addSongsToPlaylist(pl.id, songIds)
+      onSaved()
+    } catch { alert('Error al crear playlist') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold mb-4">Agregar {songIds.length} canciones a playlist</h2>
+        <div className="space-y-2 max-h-48 overflow-y-auto mb-4">
+          {playlists.map(pl => (
+            <button key={pl.id} onClick={() => addToExisting(pl.id)} disabled={saving}
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#22223a] text-sm text-[#e2e8f0] transition-colors">
+              {pl.name} <span className="text-[#94a3b8]">({pl.song_count ?? 0})</span>
+            </button>
+          ))}
+        </div>
+        <div className="border-t border-[#2e2e4a] pt-4">
+          <p className="text-xs text-[#94a3b8] mb-2 uppercase tracking-wider">Nueva playlist</p>
+          <div className="flex gap-2">
+            <input value={newName} onChange={e => setNewName(e.target.value)}
+              placeholder="Nombre de la playlist"
+              className="flex-1 px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500" />
+            <button onClick={createAndAdd} disabled={!newName.trim() || saving}
+              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm transition-colors">
+              Crear
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Library() {
   const { t } = useTranslation()
 
@@ -311,6 +370,7 @@ export default function Library() {
   const [search, setSearch] = useState('')
   const [availability, setAvailability] = useState('')
   const [filterMood, setFilterMood] = useState('')
+  const [walkmanFilter, setWalkmanFilter] = useState('')
   const [sortBy, setSortBy] = useState('title')
   const [sortDir, setSortDir] = useState('asc')
   const [moods, setMoods] = useState([])
@@ -324,6 +384,7 @@ export default function Library() {
   const [batchLoading, setBatchLoading] = useState(false)
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
   const [editSong, setEditSong] = useState(null)
+  const [showBulkPlaylist, setShowBulkPlaylist] = useState(false)
 
   useEffect(() => {
     getMoods().then(setMoods).catch(() => {})
@@ -335,13 +396,14 @@ export default function Library() {
       const params = { search: search || undefined, page: 1, limit, sort_by: sortBy, sort_dir: sortDir }
       if (availability) params.availability = availability
       if (filterMood) params.mood_id = filterMood
+      if (walkmanFilter) params.walkman_status = walkmanFilter
       const data = await getSongs(params)
       setSongs(data.items); setTotal(data.total)
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [search, availability, filterMood, sortBy, sortDir])
+  useEffect(() => { load() }, [search, availability, filterMood, walkmanFilter, sortBy, sortDir])
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta canción?')) return
@@ -479,6 +541,16 @@ export default function Library() {
           <option value="">Todos los moods</option>
           {moods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
         </select>
+        <select
+          value={walkmanFilter}
+          onChange={e => setWalkmanFilter(e.target.value)}
+          className="px-3 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500"
+        >
+          <option value="">{t('library.allStatuses')}</option>
+          <option value="on_walkman">{t('library.onWalkman')}</option>
+          <option value="wishlist">{t('library.wishlist')}</option>
+          <option value="removed">{t('library.removed')}</option>
+        </select>
         {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} {t('library.songs')}</span>}
       </div>
 
@@ -503,6 +575,10 @@ export default function Library() {
           <button onClick={handleBatchDelete} disabled={batchLoading}
             className="px-3 py-1.5 bg-red-900/20 hover:bg-red-900/40 text-red-400 text-xs rounded-lg transition-colors disabled:opacity-50">
             {t('library.batch.delete')}
+          </button>
+          <button onClick={() => setShowBulkPlaylist(true)}
+            className="px-3 py-1.5 bg-purple-700/20 hover:bg-purple-700/40 text-purple-400 text-xs rounded-lg transition-colors">
+            + Agregar a playlist
           </button>
           <button onClick={clearSelection}
             className="ml-auto text-xs text-[#94a3b8] hover:text-white transition-colors">
@@ -648,6 +724,30 @@ export default function Library() {
           setSongs(prev => prev.map(s => s.id === updated.id ? updated : s))
           setEditSong(null)
         }} />
+      )}
+
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-[#22223a] border border-[#3e3e6a] rounded-xl px-4 py-3 shadow-xl">
+          <span className="text-sm text-[#94a3b8]">{selected.size} seleccionadas</span>
+          <button
+            onClick={() => setShowBulkPlaylist(true)}
+            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Agregar a playlist
+          </button>
+          <button onClick={() => setSelected(new Set())}
+            className="text-[#94a3b8] hover:text-white transition-colors text-sm">
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      {showBulkPlaylist && (
+        <BulkAddToPlaylistModal
+          songIds={[...selected]}
+          onClose={() => setShowBulkPlaylist(false)}
+          onSaved={() => { setShowBulkPlaylist(false); setSelected(new Set()) }}
+        />
       )}
 
       {showDeleteAllConfirm && (
