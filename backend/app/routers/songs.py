@@ -8,11 +8,16 @@ from pydantic import BaseModel
 import asyncio
 import httpx
 import plistlib
+import threading
+import uuid as uuid_lib
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app import models, schemas
 
 router = APIRouter(prefix="/songs", tags=["songs"])
+
+# In-memory job store for background sync tasks
+_sync_jobs: dict[str, dict] = {}
 
 
 def _load_song(db: Session, song_id: UUID) -> models.Song:
@@ -77,6 +82,147 @@ def _get_or_create_album_sync(db: Session, title: str, artist: models.Artist | N
         db.add(album)
         db.flush()
     return album
+
+
+def _sync_job_worker(job_id: str, content: bytes, clear_unlinked: bool) -> None:
+    db = SessionLocal()
+    try:
+        data = plistlib.loads(content)
+        tracks = data.get("Tracks", {})
+        total = len(tracks)
+        _sync_jobs[job_id].update({"status": "running", "total": total, "processed": 0})
+
+        if clear_unlinked:
+            db.query(models.Song).filter(
+                models.Song.walkman_path.is_(None),
+                models.Song.walkman_status.is_(None),
+            ).delete(synchronize_session=False)
+            db.commit()
+
+        seen_ids: set = set()
+        added = 0
+        updated = 0
+        wishlist_completed = 0
+        errors: list[str] = []
+
+        for i, (track_id, track) in enumerate(tracks.items()):
+            try:
+                name = (track.get("Name") or "").strip()
+                artist_name = (track.get("Artist") or "").strip()
+                album_name = (track.get("Album") or "").strip()
+                location = (track.get("Location") or "").strip()
+                play_count = track.get("Play Count") or 0
+                skip_count = track.get("Skip Count") or 0
+                rating = track.get("Rating")
+                size = track.get("Size")
+
+                if not name:
+                    continue
+
+                song = None
+                if location:
+                    song = db.query(models.Song).filter(
+                        models.Song.walkman_path == location
+                    ).first()
+
+                if not song and name and artist_name:
+                    song = (
+                        db.query(models.Song)
+                        .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                        .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                        .filter(
+                            models.Song.title.ilike(name),
+                            models.Artist.name.ilike(artist_name),
+                        )
+                        .first()
+                    )
+
+                if song:
+                    was_wishlist = song.walkman_status == "wishlist"
+                    song.walkman_status = "on_walkman"
+                    if location:
+                        song.walkman_path = location
+                    song.walkman_play_count = play_count
+                    song.walkman_skip_count = skip_count
+                    if size is not None:
+                        song.walkman_size = size
+                    if rating is not None:
+                        song.rating = rating
+                    seen_ids.add(song.id)
+                    if was_wishlist:
+                        wishlist_completed += 1
+                    else:
+                        updated += 1
+                else:
+                    artist = _get_or_create_artist_sync(db, artist_name) if artist_name else None
+                    album = _get_or_create_album_sync(db, album_name, artist) if album_name else None
+                    new_song = models.Song(
+                        title=name,
+                        album_id=album.id if album else None,
+                        walkman_status="on_walkman",
+                        walkman_path=location or None,
+                        walkman_play_count=play_count,
+                        walkman_skip_count=skip_count,
+                        walkman_size=size,
+                        rating=rating,
+                    )
+                    db.add(new_song)
+                    db.flush()
+                    if artist:
+                        db.add(models.SongArtist(
+                            song_id=new_song.id,
+                            artist_id=artist.id,
+                            role="principal",
+                            order=0,
+                        ))
+                    db.flush()
+                    seen_ids.add(new_song.id)
+                    added += 1
+
+                # Commit every 500 tracks to avoid long transactions
+                if (i + 1) % 500 == 0:
+                    db.commit()
+                    _sync_jobs[job_id]["processed"] = i + 1
+
+            except Exception as e:
+                if len(errors) < 10:
+                    errors.append(f"Track {track_id}: {e}")
+
+        # Final commit
+        db.commit()
+
+        # Mark removed
+        removed_count = 0
+        if seen_ids:
+            to_remove = db.query(models.Song).filter(
+                models.Song.walkman_status == "on_walkman",
+                models.Song.id.notin_(seen_ids),
+            )
+            removed_count = to_remove.count()
+            to_remove.update({"walkman_status": "removed"}, synchronize_session=False)
+            db.commit()
+
+        _sync_jobs[job_id] = {
+            "status": "done",
+            "total": total,
+            "processed": total,
+            "result": {
+                "added": added,
+                "updated": updated,
+                "wishlist_completed": wishlist_completed,
+                "removed": removed_count,
+                "errors": errors,
+            },
+        }
+
+    except Exception as e:
+        _sync_jobs[job_id] = {
+            "status": "error",
+            "error": str(e),
+            "result": None,
+        }
+    finally:
+        db.close()
 
 
 @router.get("", response_model=schemas.PaginatedSongs)
@@ -182,11 +328,10 @@ def create_song(data: schemas.SongCreate, db: Session = Depends(get_db)):
     return _load_song(db, song.id)
 
 
-@router.post("/walkman-sync", response_model=schemas.WalkmanSyncResult)
+@router.post("/walkman-sync", status_code=202)
 async def walkman_sync(
     file: UploadFile = File(...),
     clear_unlinked: bool = Query(False, description="Delete songs with no walkman_path before sync (first-run cleanup)"),
-    db: Session = Depends(get_db),
 ):
     content = await file.read()
     try:
@@ -198,119 +343,25 @@ async def walkman_sync(
     if not tracks:
         raise HTTPException(status_code=400, detail="No tracks found in file")
 
-    if clear_unlinked:
-        db.query(models.Song).filter(
-            models.Song.walkman_path.is_(None),
-            models.Song.walkman_status.is_(None),
-        ).delete(synchronize_session=False)
-        db.commit()
+    job_id = str(uuid_lib.uuid4())
+    _sync_jobs[job_id] = {"status": "pending", "total": len(tracks), "processed": 0, "result": None}
 
-    seen_ids: set = set()
-    added = 0
-    updated = 0
-    wishlist_completed = 0
-    errors: list[str] = []
-
-    for track_id, track in tracks.items():
-        try:
-            name = (track.get("Name") or "").strip()
-            artist_name = (track.get("Artist") or "").strip()
-            album_name = (track.get("Album") or "").strip()
-            location = (track.get("Location") or "").strip()
-            play_count = track.get("Play Count") or 0
-            skip_count = track.get("Skip Count") or 0
-            rating = track.get("Rating")
-            size = track.get("Size")
-
-            if not name:
-                continue
-
-            # 1. Match by walkman_path
-            song = None
-            if location:
-                song = db.query(models.Song).filter(
-                    models.Song.walkman_path == location
-                ).first()
-
-            # 2. Fallback: match by title + artist
-            if not song and name and artist_name:
-                song = (
-                    db.query(models.Song)
-                    .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
-                    .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
-                    .filter(
-                        models.Song.title.ilike(name),
-                        models.Artist.name.ilike(artist_name),
-                    )
-                    .first()
-                )
-
-            if song:
-                was_wishlist = song.walkman_status == "wishlist"
-                song.walkman_status = "on_walkman"
-                if location:
-                    song.walkman_path = location
-                song.walkman_play_count = play_count
-                song.walkman_skip_count = skip_count
-                if size is not None:
-                    song.walkman_size = size
-                if rating is not None:
-                    song.rating = rating
-                db.flush()
-                seen_ids.add(song.id)
-                if was_wishlist:
-                    wishlist_completed += 1
-                else:
-                    updated += 1
-            else:
-                artist = _get_or_create_artist_sync(db, artist_name) if artist_name else None
-                album = _get_or_create_album_sync(db, album_name, artist) if album_name else None
-                new_song = models.Song(
-                    title=name,
-                    album_id=album.id if album else None,
-                    walkman_status="on_walkman",
-                    walkman_path=location or None,
-                    walkman_play_count=play_count,
-                    walkman_skip_count=skip_count,
-                    walkman_size=size,
-                    rating=rating,
-                )
-                db.add(new_song)
-                db.flush()
-                if artist:
-                    db.add(models.SongArtist(
-                        song_id=new_song.id,
-                        artist_id=artist.id,
-                        role="principal",
-                        order=0,
-                    ))
-                db.flush()
-                seen_ids.add(new_song.id)
-                added += 1
-
-        except Exception as e:
-            if len(errors) < 10:
-                errors.append(f"Track {track_id}: {e}")
-
-    # Mark songs no longer in XML as removed
-    removed_count = 0
-    if seen_ids:
-        to_remove = db.query(models.Song).filter(
-            models.Song.walkman_status == "on_walkman",
-            models.Song.id.notin_(seen_ids),
-        )
-        removed_count = to_remove.count()
-        to_remove.update({"walkman_status": "removed"}, synchronize_session=False)
-
-    db.commit()
-
-    return schemas.WalkmanSyncResult(
-        added=added,
-        updated=updated,
-        wishlist_completed=wishlist_completed,
-        removed=removed_count,
-        errors=errors,
+    thread = threading.Thread(
+        target=_sync_job_worker,
+        args=(job_id, content, clear_unlinked),
+        daemon=True,
     )
+    thread.start()
+
+    return {"job_id": job_id, "status": "pending", "total": len(tracks)}
+
+
+@router.get("/walkman-sync/status/{job_id}")
+def walkman_sync_status(job_id: str):
+    job = _sync_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.post("/wishlist", response_model=schemas.SongRead, status_code=201)
