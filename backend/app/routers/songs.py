@@ -85,6 +85,7 @@ def list_songs(
     availability: Optional[str] = Query(None),
     artist_id: Optional[UUID] = Query(None),
     mood_id: Optional[UUID] = Query(None),
+    walkman_status: Optional[str] = Query(None),
     sort_by: Optional[str] = Query("title", regex="^(title|artist|album)$"),
     sort_dir: Optional[str] = Query("asc", regex="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -118,6 +119,9 @@ def list_songs(
         q = q.join(models.SongMood, models.SongMood.song_id == models.Song.id).filter(
             models.SongMood.mood_id == mood_id
         )
+
+    if walkman_status:
+        q = q.filter(models.Song.walkman_status == walkman_status)
 
     # Fetch all matching songs; sort in Python to avoid PostgreSQL DISTINCT + ORDER BY join conflicts
     all_items = q.distinct().all()
@@ -307,6 +311,27 @@ async def walkman_sync(
         removed=removed_count,
         errors=errors,
     )
+
+
+@router.post("/wishlist", response_model=schemas.SongRead, status_code=201)
+def create_wishlist_item(body: schemas.WishlistCreate, db: Session = Depends(get_db)):
+    artist = _get_or_create_artist_sync(db, body.artist_name)
+    album = None
+    if body.album_name:
+        album = _get_or_create_album_sync(db, body.album_name, artist)
+
+    song = models.Song(
+        title=body.title,
+        album_id=album.id if album else None,
+        walkman_status="wishlist",
+        wishlist_notes=body.wishlist_notes,
+    )
+    db.add(song)
+    db.flush()
+    db.add(models.SongArtist(song_id=song.id, artist_id=artist.id, role="principal", order=0))
+    db.commit()
+    db.refresh(song)
+    return _load_song(db, song.id)
 
 
 @router.get("/{song_id}", response_model=schemas.SongRead)
