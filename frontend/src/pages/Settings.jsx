@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n/index.js'
 import { getSpotifyLoginUrl, getSpotifyStatus, syncSpotify } from '../api/auth'
+import { walkmanSync } from '../api/walkman'
 
 export default function Settings() {
   const { t } = useTranslation()
@@ -17,6 +18,11 @@ export default function Settings() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [connecting, setConnecting] = useState(false)
+
+  const [xmlFile, setXmlFile] = useState(null)
+  const [clearUnlinked, setClearUnlinked] = useState(false)
+  const [walkmanSyncing, setWalkmanSyncing] = useState(false)
+  const [walkmanSyncResult, setWalkmanSyncResult] = useState(null)
 
   // Check URL params for connection result
   useEffect(() => {
@@ -61,6 +67,20 @@ export default function Settings() {
     } catch (e) {
       alert(e.response?.data?.detail || t('settings.spotify.syncError'))
     } finally { setSyncing(false) }
+  }
+
+  const handleWalkmanSync = async () => {
+    if (!xmlFile) return
+    setWalkmanSyncing(true)
+    setWalkmanSyncResult(null)
+    try {
+      const result = await walkmanSync(xmlFile, clearUnlinked)
+      setWalkmanSyncResult(result)
+    } catch (e) {
+      setWalkmanSyncResult({ error: e.response?.data?.detail || 'Error al sincronizar' })
+    } finally {
+      setWalkmanSyncing(false)
+    }
   }
 
   const formatExpiry = (dateStr) => {
@@ -153,6 +173,55 @@ export default function Settings() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Walkman Sync */}
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 mb-6">
+        <h2 className="text-base font-semibold mb-1">{t('walkman.sync')}</h2>
+        <p className="text-sm text-[#94a3b8] mb-4">{t('walkman.syncDesc')}</p>
+
+        <div className="space-y-3">
+          <input
+            type="file"
+            accept=".xml"
+            onChange={e => setXmlFile(e.target.files[0] || null)}
+            className="block w-full text-sm text-[#94a3b8] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:text-sm file:cursor-pointer hover:file:bg-purple-700"
+          />
+
+          <label className="flex items-center gap-2 text-sm text-[#94a3b8] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={clearUnlinked}
+              onChange={e => setClearUnlinked(e.target.checked)}
+              className="rounded border-[#2e2e4a] bg-[#0f0f13] text-purple-600 focus:ring-purple-500"
+            />
+            {t('walkman.clearUnlinked')}
+          </label>
+
+          <button
+            onClick={handleWalkmanSync}
+            disabled={!xmlFile || walkmanSyncing}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            {walkmanSyncing ? t('walkman.syncing') : t('walkman.sync')}
+          </button>
+
+          {walkmanSyncResult && !walkmanSyncResult.error && (
+            <div className="mt-3 p-4 bg-green-900/20 border border-green-800 rounded-lg text-sm space-y-1">
+              <p className="font-medium text-green-400">{t('walkman.syncDone')}</p>
+              <p className="text-[#94a3b8]">
+                +{walkmanSyncResult.added} {t('walkman.added')} · {walkmanSyncResult.updated} {t('walkman.updated')} · {walkmanSyncResult.removed} {t('walkman.removed')} · {walkmanSyncResult.wishlist_completed} {t('walkman.wishlistCompleted')}
+              </p>
+              {walkmanSyncResult.errors.length > 0 && (
+                <p className="text-amber-400">{walkmanSyncResult.errors.length} {t('walkman.errors')}</p>
+              )}
+            </div>
+          )}
+
+          {walkmanSyncResult?.error && (
+            <p className="text-sm text-red-400 mt-2">{walkmanSyncResult.error}</p>
+          )}
+        </div>
       </div>
 
       {/* MusicBrainz info */}
