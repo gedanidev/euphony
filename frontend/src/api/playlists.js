@@ -9,3 +9,11 @@ export const addSongsToPlaylist   = (id, song_ids)     => api.post(`/playlists/$
 export const removeSongFromPlaylist = (id, song_id)    => api.delete(`/playlists/${id}/songs/${song_id}`).then(r => r.data)
 export const reorderPlaylist      = (id, order)        => api.patch(`/playlists/${id}/reorder`, { order }).then(r => r.data)
 export const exportPlaylist       = (id, format)       => api.get(`/playlists/${id}/export`, { params: { format }, responseType: 'blob' }).then(r => r.data)
+
+export const importPlaylist = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/playlists/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+}
