@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 import asyncio
 import httpx
+import plistlib
 
 from app.database import get_db
 from app import models, schemas
@@ -53,6 +54,29 @@ def _apply_relations(db: Session, song: models.Song, data: schemas.SongCreate | 
         db.query(models.SongMood).filter(models.SongMood.song_id == song.id).delete()
         for mood_id in data.mood_ids:
             db.add(models.SongMood(song_id=song.id, mood_id=mood_id))
+
+
+def _get_or_create_artist_sync(db: Session, name: str) -> models.Artist:
+    name = name.strip()
+    artist = db.query(models.Artist).filter(models.Artist.name.ilike(name)).first()
+    if not artist:
+        artist = models.Artist(name=name)
+        db.add(artist)
+        db.flush()
+    return artist
+
+
+def _get_or_create_album_sync(db: Session, title: str, artist: models.Artist | None) -> models.Album:
+    title = title.strip()
+    q = db.query(models.Album).filter(models.Album.title.ilike(title))
+    if artist:
+        q = q.filter(models.Album.artist_id == artist.id)
+    album = q.first()
+    if not album:
+        album = models.Album(title=title, artist_id=artist.id if artist else None)
+        db.add(album)
+        db.flush()
+    return album
 
 
 @router.get("", response_model=schemas.PaginatedSongs)
@@ -152,6 +176,137 @@ def create_song(data: schemas.SongCreate, db: Session = Depends(get_db)):
     _apply_relations(db, song, data)
     db.commit()
     return _load_song(db, song.id)
+
+
+@router.post("/walkman-sync", response_model=schemas.WalkmanSyncResult)
+async def walkman_sync(
+    file: UploadFile = File(...),
+    clear_unlinked: bool = Query(False, description="Delete songs with no walkman_path before sync (first-run cleanup)"),
+    db: Session = Depends(get_db),
+):
+    content = await file.read()
+    try:
+        data = plistlib.loads(content)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid plist XML file")
+
+    tracks = data.get("Tracks", {})
+    if not tracks:
+        raise HTTPException(status_code=400, detail="No tracks found in file")
+
+    if clear_unlinked:
+        db.query(models.Song).filter(
+            models.Song.walkman_path.is_(None),
+            models.Song.walkman_status.is_(None),
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    seen_ids: set = set()
+    added = 0
+    updated = 0
+    wishlist_completed = 0
+    errors: list[str] = []
+
+    for track_id, track in tracks.items():
+        try:
+            name = (track.get("Name") or "").strip()
+            artist_name = (track.get("Artist") or "").strip()
+            album_name = (track.get("Album") or "").strip()
+            location = (track.get("Location") or "").strip()
+            play_count = track.get("Play Count") or 0
+            skip_count = track.get("Skip Count") or 0
+            rating = track.get("Rating")
+            size = track.get("Size")
+
+            if not name:
+                continue
+
+            # 1. Match by walkman_path
+            song = None
+            if location:
+                song = db.query(models.Song).filter(
+                    models.Song.walkman_path == location
+                ).first()
+
+            # 2. Fallback: match by title + artist
+            if not song and name and artist_name:
+                song = (
+                    db.query(models.Song)
+                    .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                    .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                    .filter(
+                        models.Song.title.ilike(name),
+                        models.Artist.name.ilike(artist_name),
+                    )
+                    .first()
+                )
+
+            if song:
+                was_wishlist = song.walkman_status == "wishlist"
+                song.walkman_status = "on_walkman"
+                if location:
+                    song.walkman_path = location
+                song.walkman_play_count = play_count
+                song.walkman_skip_count = skip_count
+                if size is not None:
+                    song.walkman_size = size
+                if rating is not None:
+                    song.rating = rating
+                db.flush()
+                seen_ids.add(song.id)
+                if was_wishlist:
+                    wishlist_completed += 1
+                else:
+                    updated += 1
+            else:
+                artist = _get_or_create_artist_sync(db, artist_name) if artist_name else None
+                album = _get_or_create_album_sync(db, album_name, artist) if album_name else None
+                new_song = models.Song(
+                    title=name,
+                    album_id=album.id if album else None,
+                    walkman_status="on_walkman",
+                    walkman_path=location or None,
+                    walkman_play_count=play_count,
+                    walkman_skip_count=skip_count,
+                    walkman_size=size,
+                    rating=rating,
+                )
+                db.add(new_song)
+                db.flush()
+                if artist:
+                    db.add(models.SongArtist(
+                        song_id=new_song.id,
+                        artist_id=artist.id,
+                        role="principal",
+                        order=0,
+                    ))
+                db.flush()
+                seen_ids.add(new_song.id)
+                added += 1
+
+        except Exception as e:
+            if len(errors) < 10:
+                errors.append(f"Track {track_id}: {e}")
+
+    # Mark songs no longer in XML as removed
+    removed_count = 0
+    if seen_ids:
+        to_remove = db.query(models.Song).filter(
+            models.Song.walkman_status == "on_walkman",
+            models.Song.id.notin_(seen_ids),
+        )
+        removed_count = to_remove.count()
+        to_remove.update({"walkman_status": "removed"}, synchronize_session=False)
+
+    db.commit()
+
+    return schemas.WalkmanSyncResult(
+        added=added,
+        updated=updated,
+        wishlist_completed=wishlist_completed,
+        removed=removed_count,
+        errors=errors,
+    )
 
 
 @router.get("/{song_id}", response_model=schemas.SongRead)
