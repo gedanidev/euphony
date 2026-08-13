@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n/index.js'
 import { getSpotifyLoginUrl, getSpotifyStatus, syncSpotify } from '../api/auth'
-import { walkmanSync } from '../api/walkman'
+import { walkmanSyncStart, walkmanSyncStatus } from '../api/walkman'
 
 export default function Settings() {
   const { t } = useTranslation()
@@ -23,6 +23,7 @@ export default function Settings() {
   const [clearUnlinked, setClearUnlinked] = useState(false)
   const [walkmanSyncing, setWalkmanSyncing] = useState(false)
   const [walkmanSyncResult, setWalkmanSyncResult] = useState(null)
+  const [walkmanProgress, setWalkmanProgress] = useState(null)
 
   // Check URL params for connection result
   useEffect(() => {
@@ -73,13 +74,39 @@ export default function Settings() {
     if (!xmlFile) return
     setWalkmanSyncing(true)
     setWalkmanSyncResult(null)
+    setWalkmanProgress(null)
+
     try {
-      const result = await walkmanSync(xmlFile, clearUnlinked)
-      setWalkmanSyncResult(result)
+      const { job_id, total } = await walkmanSyncStart(xmlFile, clearUnlinked)
+      setWalkmanProgress({ processed: 0, total })
+
+      const poll = setInterval(async () => {
+        try {
+          const job = await walkmanSyncStatus(job_id)
+          if (job.status === 'running' || job.status === 'pending') {
+            setWalkmanProgress({ processed: job.processed ?? 0, total: job.total ?? total })
+          } else if (job.status === 'done') {
+            clearInterval(poll)
+            setWalkmanSyncing(false)
+            setWalkmanProgress(null)
+            setWalkmanSyncResult(job.result)
+          } else if (job.status === 'error') {
+            clearInterval(poll)
+            setWalkmanSyncing(false)
+            setWalkmanProgress(null)
+            setWalkmanSyncResult({ error: job.error || 'Error desconocido' })
+          }
+        } catch {
+          clearInterval(poll)
+          setWalkmanSyncing(false)
+          setWalkmanProgress(null)
+          setWalkmanSyncResult({ error: 'Error al consultar estado del sync' })
+        }
+      }, 2000)
     } catch (e) {
-      setWalkmanSyncResult({ error: e.response?.data?.detail || 'Error al sincronizar' })
-    } finally {
       setWalkmanSyncing(false)
+      setWalkmanProgress(null)
+      setWalkmanSyncResult({ error: e.response?.data?.detail || 'Error al iniciar sync' })
     }
   }
 
@@ -201,10 +228,28 @@ export default function Settings() {
           <button
             onClick={handleWalkmanSync}
             disabled={!xmlFile || walkmanSyncing}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
+            {walkmanSyncing && (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            )}
             {walkmanSyncing ? t('walkman.syncing') : t('walkman.sync')}
           </button>
+
+          {walkmanSyncing && walkmanProgress && (
+            <div className="flex items-center gap-2 text-sm text-[#94a3b8]">
+              <svg className="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              <span>
+                {walkmanProgress.processed.toLocaleString()} / {walkmanProgress.total.toLocaleString()} canciones procesadas
+              </span>
+            </div>
+          )}
 
           {walkmanSyncResult && !walkmanSyncResult.error && (
             <div className="mt-3 p-4 bg-green-900/20 border border-green-800 rounded-lg text-sm space-y-1">
@@ -212,7 +257,7 @@ export default function Settings() {
               <p className="text-[#94a3b8]">
                 +{walkmanSyncResult.added} {t('walkman.added')} · {walkmanSyncResult.updated} {t('walkman.updated')} · {walkmanSyncResult.removed} {t('walkman.removed')} · {walkmanSyncResult.wishlist_completed} {t('walkman.wishlistCompleted')}
               </p>
-              {walkmanSyncResult.errors.length > 0 && (
+              {walkmanSyncResult.errors?.length > 0 && (
                 <p className="text-amber-400">{walkmanSyncResult.errors.length} {t('walkman.errors')}</p>
               )}
             </div>
