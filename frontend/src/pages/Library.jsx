@@ -374,7 +374,8 @@ export default function Library() {
   const [sortBy, setSortBy] = useState('title')
   const [sortDir, setSortDir] = useState('asc')
   const [moods, setMoods] = useState([])
-  const limit = 20000
+  const limit = 100
+  const [page, setPage] = useState(1)
 
   const [songModal, setSongModal] = useState(null)
   const [addToPlaylist, setAddToPlaylist] = useState(null)
@@ -393,7 +394,7 @@ export default function Library() {
   const load = async () => {
     try {
       setLoading(true); setError(null)
-      const params = { search: search || undefined, page: 1, limit, sort_by: sortBy, sort_dir: sortDir }
+      const params = { search: search || undefined, page, limit, sort_by: sortBy, sort_dir: sortDir }
       if (availability) params.availability = availability
       if (filterMood) params.mood_id = filterMood
       if (walkmanFilter) params.walkman_status = walkmanFilter
@@ -403,7 +404,8 @@ export default function Library() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [search, availability, filterMood, walkmanFilter, sortBy, sortDir])
+  useEffect(() => { setPage(1) }, [search, availability, filterMood, walkmanFilter, sortBy, sortDir])
+  useEffect(() => { load() }, [page, search, availability, filterMood, walkmanFilter, sortBy, sortDir])
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta canción?')) return
@@ -551,7 +553,7 @@ export default function Library() {
           <option value="wishlist">{t('library.wishlist')}</option>
           <option value="removed">{t('library.removed')}</option>
         </select>
-        {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} {t('library.songs')}</span>}
+        {total > 0 && <span className="text-[#94a3b8] text-sm ml-auto">{total} {t('library.songs')} · p. {page}/{Math.ceil(total / limit)}</span>}
       </div>
 
       {/* Batch action bar */}
@@ -700,6 +702,23 @@ export default function Library() {
                 ))}
               </tbody>
             </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {Math.ceil(total / limit) > 1 && (
+        <div className="flex items-center justify-center gap-3 mt-4 pb-4">
+          <button onClick={() => setPage(p => p - 1)} disabled={page <= 1}
+            className="px-3 py-1.5 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#94a3b8] hover:text-white disabled:opacity-40 transition-colors">
+            ← Anterior
+          </button>
+          <span className="text-sm text-[#94a3b8]">
+            {page} / {Math.ceil(total / limit)}
+          </span>
+          <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)}
+            className="px-3 py-1.5 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#94a3b8] hover:text-white disabled:opacity-40 transition-colors">
+            Siguiente →
+          </button>
         </div>
       )}
 
