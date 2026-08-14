@@ -353,6 +353,60 @@ function BulkAddToPlaylistModal({ songIds, onClose, onSaved }) {
   )
 }
 
+function RowActionsMenu({ song, onAddToPlaylist, onEditSong, onLyrics, onEnrich, onEdit, onDelete, enriching, onFavorite }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+  return (
+    <div className="flex items-center gap-1 justify-end" ref={ref} onClick={e => e.stopPropagation()}>
+      <button onClick={() => onFavorite()}
+        className={`w-6 h-6 flex items-center justify-center text-sm rounded transition-colors ${song.is_favorite ? 'text-pink-500' : 'text-[#3d3d5c] hover:text-pink-400'}`}>
+        {song.is_favorite ? '♥' : '♡'}
+      </button>
+      <div className="relative">
+        <button onClick={() => setOpen(v => !v)}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-[#64748b] hover:text-white hover:bg-[#2e2e4a] transition-colors leading-none font-bold tracking-widest">
+          ···
+        </button>
+        {open && (
+          <div className="absolute right-0 top-8 z-30 bg-[#1a1a24] border border-[#2e2e4a] rounded-xl shadow-2xl py-1 w-44 text-sm">
+            <button onClick={() => { onAddToPlaylist(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#e2e8f0] hover:bg-[#22223a] transition-colors">
+              + Agregar a playlist
+            </button>
+            <button onClick={() => { onEditSong(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#e2e8f0] hover:bg-[#22223a] transition-colors">
+              ♬ Género / vocal
+            </button>
+            <button onClick={() => { onLyrics(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#e2e8f0] hover:bg-[#22223a] transition-colors">
+              ♪ Letras
+            </button>
+            <button onClick={() => { onEnrich(); setOpen(false) }} disabled={enriching}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#e2e8f0] hover:bg-[#22223a] transition-colors disabled:opacity-40">
+              {enriching ? '…' : '✦'} Enriquecer
+            </button>
+            <button onClick={() => { onEdit(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[#e2e8f0] hover:bg-[#22223a] transition-colors">
+              ✎ Editar
+            </button>
+            <div className="border-t border-[#2e2e4a] my-1" />
+            <button onClick={() => { onDelete(); setOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-400 hover:bg-red-900/20 transition-colors">
+              ✕ Eliminar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Library() {
   const { t } = useTranslation()
 
@@ -623,9 +677,8 @@ export default function Library() {
                   <th className="px-4 py-3">{t('library.col.year')}</th>
                   <th className="px-4 py-3">{t('library.col.status')}</th>
                   <th className="px-4 py-3 text-right">{t('library.col.duration')}</th>
-                  <th className="px-4 py-3" />
-                  <th className="px-2 py-3 w-8" />
-                  <th className="px-4 py-3 w-40" />
+                  <th className="px-2 py-3 w-24" />
+                  <th className="px-2 py-3 w-20" />
                 </tr>
               </thead>
               <tbody>
@@ -646,57 +699,24 @@ export default function Library() {
                     <td className="px-4 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
                     <td className="px-2 py-2 whitespace-nowrap">
                       <RatingStars
-                        rating={song.rating}
+                        rating={song.rating || null}
                         onChange={(r) => handleRating(song.id, r)}
                         compact
+                        size="sm"
                       />
                     </td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <button
-                        onClick={e => { e.stopPropagation(); handleFavorite(song.id) }}
-                        className={`text-lg transition-colors ${song.is_favorite ? 'text-pink-500' : 'text-[#3d3d5c] hover:text-pink-400'}`}
-                        title={song.is_favorite ? t('favorite.remove') : t('favorite.add')}
-                      >
-                        {song.is_favorite ? '♥' : '♡'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all justify-end">
-                        <button onClick={() => setAddToPlaylist(song.id)}
-                          className="text-purple-400/70 hover:text-purple-400 text-xs font-medium transition-colors"
-                          title="Agregar a playlist">
-                          + Lista
-                        </button>
-                        <button onClick={() => setEditSong(song)}
-                          className="text-teal-400/70 hover:text-teal-400 text-xs font-medium transition-colors"
-                          title="Editar género y tipo vocal">
-                          ♬
-                        </button>
-                        <button onClick={() => setLyricsModal(song)}
-                          className="text-yellow-400/70 hover:text-yellow-400 text-xs font-medium transition-colors"
-                          title={t('lyrics.title')}>
-                          ♪
-                        </button>
-                        <button onClick={() => handleEnrich(song.id)} disabled={enriching === song.id}
-                          className="text-blue-400/70 hover:text-blue-400 text-xs font-medium transition-colors disabled:opacity-40"
-                          title="Enriquecer metadata">
-                          {enriching === song.id ? '…' : '✦'}
-                        </button>
-                        <button onClick={() => setSongModal({ mode: 'edit', song })}
-                          className="text-[#94a3b8] hover:text-white transition-colors" title="Editar">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                        <button onClick={() => handleDelete(song.id)}
-                          className="text-red-400/50 hover:text-red-400 transition-colors" title="Eliminar">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
+                    <td className="px-2 py-2">
+                      <RowActionsMenu
+                        song={song}
+                        enriching={enriching === song.id}
+                        onFavorite={() => handleFavorite(song.id)}
+                        onAddToPlaylist={() => setAddToPlaylist(song.id)}
+                        onEditSong={() => setEditSong(song)}
+                        onLyrics={() => setLyricsModal(song)}
+                        onEnrich={() => handleEnrich(song.id)}
+                        onEdit={() => setSongModal({ mode: 'edit', song })}
+                        onDelete={() => handleDelete(song.id)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -712,9 +732,20 @@ export default function Library() {
             className="px-3 py-1.5 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#94a3b8] hover:text-white disabled:opacity-40 transition-colors">
             ← Anterior
           </button>
-          <span className="text-sm text-[#94a3b8]">
-            {page} / {Math.ceil(total / limit)}
-          </span>
+          <div className="flex items-center gap-1.5 text-sm text-[#94a3b8]">
+            <input
+              type="number"
+              min={1}
+              max={Math.ceil(total / limit)}
+              value={page}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10)
+                if (v >= 1 && v <= Math.ceil(total / limit)) setPage(v)
+              }}
+              className="w-14 text-center bg-[#1a1a24] border border-[#2e2e4a] rounded-lg py-1 text-[#e2e8f0] focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span>/ {Math.ceil(total / limit)}</span>
+          </div>
           <button onClick={() => setPage(p => p + 1)} disabled={page >= Math.ceil(total / limit)}
             className="px-3 py-1.5 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#94a3b8] hover:text-white disabled:opacity-40 transition-colors">
             Siguiente →
