@@ -275,5 +275,25 @@
   "library.onWalkman": "On Walkman",
   "library.wishlist": "Wishlist",
   "library.removed": "Removed",
-  "library.allStatuses": "All"
+  "library.allStatuses": "All",
+
+  "shazam.searchTitle": "Search Shazam",
+  "shazam.searchPlaceholder": "Search by title or artist...",
+  "shazam.searching": "Searching...",
+  "shazam.results": "Results",
+  "shazam.noResults": "No results found",
+  "shazam.addToWishlist": "Add to wishlist",
+  "shazam.alreadyInLibrary": "Already in library",
+  "shazam.addConfirmTitle": "Add to wishlist?",
+  "shazam.addConfirmDesc": "Do you want to add \"{{title}}\" by {{artist}} to your wishlist?",
+  "shazam.addedSuccess": "Added to wishlist",
+  "shazam.addError": "Error adding",
+  "shazam.close": "Close",
+  "shazam.apiError": "Shazam API error",
+  "shazam.apiNotConfigured": "API key not configured",
+  "shazam.wishlistTitle": "Found a song?",
+  "shazam.wishlistDesc": "Search on Shazam and add it directly to your wishlist",
+  "shazam.searchButton": "Search on Shazam",
+  "shazam.emptyWishlistTitle": "Your wishlist is empty",
+  "shazam.emptyWishlistDesc": "Search for songs on Shazam or add them manually to get started"
 }
