@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { getArtists, createArtist, deleteArtist, toggleArtistPreferred } from '../api/artists'
@@ -72,24 +72,37 @@ export default function Artists() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('artists-view') || 'grid')
+  const [letter, setLetter] = useState(null)
   const limit = 48
   const navigate = useNavigate()
+  const [page, setPageState] = useState(() => parseInt(sessionStorage.getItem('artists-page') || '1', 10))
+  const setPage = (v) => setPageState(prev => {
+    const next = typeof v === 'function' ? v(prev) : v
+    sessionStorage.setItem('artists-page', String(next))
+    return next
+  })
   const { t } = useTranslation()
+  const filtersReady = useRef(false)
+
+  const LETTERS = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')]
 
   const load = async () => {
     try {
       setLoading(true); setError(null)
-      const data = await getArtists({ search: search || undefined, page, limit })
+      const data = await getArtists({ search: search || undefined, letter: letter || undefined, page, limit })
       setArtists(data.items); setTotal(data.total)
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [search, page])
-  useEffect(() => { setPage(1) }, [search])
+  useEffect(() => {
+    if (!filtersReady.current) { filtersReady.current = true; return }
+    setPage(1)
+  }, [search, letter])
+
+  useEffect(() => { load() }, [search, letter, page])
 
   const handlePreferred = async (e, artistId) => {
     e.stopPropagation()
@@ -120,7 +133,7 @@ export default function Artists() {
       </div>
 
       <div className="flex items-center gap-4 mb-6">
-        <input type="text" placeholder={t('artists.search')} value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder={t('artists.search')} value={search} onChange={e => { setSearch(e.target.value); setLetter(null) }}
           className="w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500" />
         {total > 0 && <span className="text-[#94a3b8] text-sm">{total} {t('artists.count')}</span>}
         <div className="ml-auto flex gap-1 border border-[#2e2e4a] rounded-lg p-0.5">
@@ -139,6 +152,20 @@ export default function Artists() {
             </svg>
           </button>
         </div>
+      </div>
+
+      <div className="flex gap-1 mb-4 overflow-x-auto pb-1 scrollbar-none">
+        {LETTERS.map(l => (
+          <button
+            key={l}
+            onClick={() => { setLetter(letter === l ? null : l); setSearch('') }}
+            className={`flex-shrink-0 w-8 h-8 rounded-md text-xs font-medium transition-colors ${
+              letter === l
+                ? 'bg-purple-600 text-white'
+                : 'bg-[#1a1a24] border border-[#2e2e4a] text-[#94a3b8] hover:border-purple-500/50 hover:text-white'
+            }`}
+          >{l}</button>
+        ))}
       </div>
 
       {loading && <LoadingSpinner />}
@@ -226,7 +253,14 @@ export default function Artists() {
             <div className="flex items-center justify-center gap-3 mt-6">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white transition-colors">{t('common.prev')}</button>
-              <span className="text-[#94a3b8] text-sm">{page} / {totalPages}</span>
+              <input
+                key={page}
+                type="number" min={1} max={totalPages} defaultValue={page}
+                onBlur={e => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) setPage(v) }}
+                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) { setPage(v); e.target.blur() } } }}
+                className="w-14 text-center bg-[#1a1a24] border border-[#2e2e4a] rounded-lg py-1 text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="text-[#94a3b8] text-sm">/ {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                 className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white transition-colors">{t('common.next')}</button>
             </div>

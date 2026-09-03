@@ -193,7 +193,7 @@ export default function ArtistDetail() {
   return (
     <div className="p-6 max-w-5xl">
       {/* Back */}
-      <button onClick={() => navigate('/artists')} className="text-[#94a3b8] hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
+      <button onClick={() => navigate(-1)} className="text-[#94a3b8] hover:text-white text-sm mb-6 flex items-center gap-2 transition-colors">
         ← Artistas
       </button>
 

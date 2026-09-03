@@ -9,6 +9,7 @@ import asyncio
 import httpx
 import plistlib
 import threading
+import time
 import uuid as uuid_lib
 
 from app.database import get_db, SessionLocal
@@ -61,17 +62,18 @@ def _apply_relations(db: Session, song: models.Song, data: schemas.SongCreate | 
             db.add(models.SongMood(song_id=song.id, mood_id=mood_id))
 
 
-def _get_or_create_artist_sync(db: Session, name: str) -> models.Artist:
+def _get_or_create_artist_sync(db: Session, name: str) -> tuple[models.Artist, bool]:
     name = name.strip()
     artist = db.query(models.Artist).filter(models.Artist.name.ilike(name)).first()
     if not artist:
         artist = models.Artist(name=name)
         db.add(artist)
         db.flush()
-    return artist
+        return artist, True
+    return artist, False
 
 
-def _get_or_create_album_sync(db: Session, title: str, artist: models.Artist | None) -> models.Album:
+def _get_or_create_album_sync(db: Session, title: str, artist: models.Artist | None) -> tuple[models.Album, bool]:
     title = title.strip()
     q = db.query(models.Album).filter(models.Album.title.ilike(title))
     if artist:
@@ -81,7 +83,8 @@ def _get_or_create_album_sync(db: Session, title: str, artist: models.Artist | N
         album = models.Album(title=title, artist_id=artist.id if artist else None)
         db.add(album)
         db.flush()
-    return album
+        return album, True
+    return album, False
 
 
 def _sync_job_worker(job_id: str, content: bytes, clear_unlinked: bool) -> None:
@@ -100,6 +103,8 @@ def _sync_job_worker(job_id: str, content: bytes, clear_unlinked: bool) -> None:
             db.commit()
 
         seen_ids: set = set()
+        new_album_ids: set = set()
+        new_artist_ids: set = set()
         added = 0
         updated = 0
         wishlist_completed = 0
@@ -154,8 +159,12 @@ def _sync_job_worker(job_id: str, content: bytes, clear_unlinked: bool) -> None:
                     else:
                         updated += 1
                 else:
-                    artist = _get_or_create_artist_sync(db, artist_name) if artist_name else None
-                    album = _get_or_create_album_sync(db, album_name, artist) if album_name else None
+                    artist, artist_created = _get_or_create_artist_sync(db, artist_name) if artist_name else (None, False)
+                    album, album_created = _get_or_create_album_sync(db, album_name, artist) if album_name else (None, False)
+                    if artist_created and artist:
+                        new_artist_ids.add(artist.id)
+                    if album_created and album:
+                        new_album_ids.add(album.id)
                     new_song = models.Song(
                         title=name,
                         album_id=album.id if album else None,
@@ -201,6 +210,34 @@ def _sync_job_worker(job_id: str, content: bytes, clear_unlinked: bool) -> None:
             removed_count = to_remove.count()
             to_remove.update({"walkman_status": "removed"}, synchronize_session=False)
             db.commit()
+
+        # Auto-enrich newly created albums and artists
+        if new_album_ids or new_artist_ids:
+            from app.routers.enrich import _enrich_album_now, _enrich_artist_now
+            _sync_jobs[job_id]["status"] = "enriching"
+            for album_id in new_album_ids:
+                try:
+                    album = (
+                        db.query(models.Album)
+                        .options(selectinload(models.Album.artist))
+                        .filter(models.Album.id == album_id)
+                        .first()
+                    )
+                    if album and not album.cover_url:
+                        _enrich_album_now(album)
+                        db.commit()
+                except Exception:
+                    pass
+                time.sleep(1.1)
+            for artist_id in new_artist_ids:
+                try:
+                    artist = db.query(models.Artist).filter(models.Artist.id == artist_id).first()
+                    if artist and not artist.image_url:
+                        _enrich_artist_now(artist)
+                        db.commit()
+                except Exception:
+                    pass
+                time.sleep(1.1)
 
         _sync_jobs[job_id] = {
             "status": "done",
@@ -366,10 +403,10 @@ def walkman_sync_status(job_id: str):
 
 @router.post("/wishlist", response_model=schemas.SongRead, status_code=201)
 def create_wishlist_item(body: schemas.WishlistCreate, db: Session = Depends(get_db)):
-    artist = _get_or_create_artist_sync(db, body.artist_name)
+    artist, _ = _get_or_create_artist_sync(db, body.artist_name)
     album = None
     if body.album_name:
-        album = _get_or_create_album_sync(db, body.album_name, artist)
+        album, _ = _get_or_create_album_sync(db, body.album_name, artist)
 
     song = models.Song(
         title=body.title,

@@ -10,12 +10,17 @@ Integrates:
 import asyncio
 import httpx
 import musicbrainzngs
+import threading
+import time
+import uuid as uuid_lib
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload
 from uuid import UUID
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app import models, schemas
+
+_enrich_jobs: dict[str, dict] = {}
 
 router = APIRouter(prefix="", tags=["enrich"])
 
@@ -228,6 +233,197 @@ async def _fetch_artist_image(artist_name: str) -> str | None:
     """Busca imagen del artista en TheAudioDB (primera opción)."""
     candidates = await _fetch_artist_image_candidates(artist_name)
     return candidates[0] if candidates else None
+
+
+# ---------------------------------------------------------------------------
+# Single-item enrich helpers (reusable from batch workers and walkman sync)
+# ---------------------------------------------------------------------------
+
+def _enrich_album_now(album: models.Album, db=None) -> bool:
+    """Fetch cover from MusicBrainz/CAA for one album. Returns True if cover found."""
+    artist_name = album.artist.name if album.artist else None
+
+    async def _fetch():
+        mbid = album.mbid
+        cover_url = None
+        if not mbid:
+            cover_url, mbid = await _fetch_cover_by_name(album.title, artist_name)
+        if not cover_url and mbid:
+            cover_url = await _fetch_cover_art(mbid)
+        if not cover_url:
+            candidates = await _fetch_cover_candidates(album.title, artist_name)
+            cover_url = candidates[0] if candidates else None
+        return mbid, cover_url
+
+    try:
+        mbid, cover_url = _run(_fetch())
+        if mbid and not album.mbid:
+            if db is None or not db.query(models.Album).filter(
+                models.Album.mbid == mbid,
+                models.Album.id != album.id,
+            ).first():
+                album.mbid = mbid
+        if cover_url and not album.cover_url:
+            album.cover_url = cover_url
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _enrich_artist_now(artist: models.Artist, db=None) -> bool:
+    """Fetch image/metadata for one artist. Returns True if image found."""
+    try:
+        result = musicbrainzngs.search_artists(artist=artist.name, limit=1)
+        mb_artists = result.get("artist-list", [])
+        if mb_artists:
+            mb = mb_artists[0]
+            if not artist.mbid:
+                new_mbid = mb.get("id")
+                if new_mbid and (db is None or not db.query(models.Artist).filter(
+                    models.Artist.mbid == new_mbid,
+                    models.Artist.id != artist.id,
+                ).first()):
+                    artist.mbid = new_mbid
+            if not artist.country:
+                artist.country = mb.get("country")
+            if not artist.region:
+                area = mb.get("begin-area") or mb.get("area")
+                if area:
+                    artist.region = area.get("name")
+    except Exception:
+        pass
+
+    if not artist.image_url:
+        try:
+            image_url = _run(_fetch_artist_image(artist.name))
+            if image_url:
+                artist.image_url = image_url
+                return True
+        except Exception:
+            pass
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Batch enrich workers
+# ---------------------------------------------------------------------------
+
+def _album_enrich_worker(job_id: str) -> None:
+    db = SessionLocal()
+    try:
+        albums = (
+            db.query(models.Album)
+            .options(selectinload(models.Album.artist))
+            .filter(models.Album.cover_url.is_(None))
+            .all()
+        )
+        total = len(albums)
+        _enrich_jobs[job_id].update({"status": "running", "total": total, "processed": 0, "found": 0})
+        found = 0
+        for i, album in enumerate(albums):
+            if _enrich_jobs[job_id].get("cancelled"):
+                _enrich_jobs[job_id]["status"] = "cancelled"
+                return
+            try:
+                if _enrich_album_now(album, db=db):
+                    found += 1
+                db.commit()
+            except Exception:
+                db.rollback()
+            _enrich_jobs[job_id].update({"processed": i + 1, "found": found})
+            time.sleep(1.1)
+        _enrich_jobs[job_id] = {"status": "done", "total": total, "processed": total, "found": found}
+    except Exception as e:
+        _enrich_jobs[job_id] = {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+def _artist_enrich_worker(job_id: str) -> None:
+    db = SessionLocal()
+    try:
+        artists = (
+            db.query(models.Artist)
+            .filter(models.Artist.image_url.is_(None))
+            .all()
+        )
+        total = len(artists)
+        _enrich_jobs[job_id].update({"status": "running", "total": total, "processed": 0, "found": 0})
+        found = 0
+        for i, artist in enumerate(artists):
+            if _enrich_jobs[job_id].get("cancelled"):
+                _enrich_jobs[job_id]["status"] = "cancelled"
+                return
+            try:
+                if _enrich_artist_now(artist, db=db):
+                    found += 1
+                db.commit()
+            except Exception:
+                db.rollback()
+            _enrich_jobs[job_id].update({"processed": i + 1, "found": found})
+            time.sleep(1.1)
+        _enrich_jobs[job_id] = {"status": "done", "total": total, "processed": total, "found": found}
+    except Exception as e:
+        _enrich_jobs[job_id] = {"status": "error", "error": str(e)}
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Batch enrich endpoints (must be before /{album_id} and /{artist_id} routes)
+# ---------------------------------------------------------------------------
+
+@router.post("/albums/enrich-all", status_code=202)
+def albums_enrich_all(db: Session = Depends(get_db)):
+    total = db.query(models.Album).filter(models.Album.cover_url.is_(None)).count()
+    job_id = str(uuid_lib.uuid4())
+    _enrich_jobs[job_id] = {"status": "pending", "total": total, "processed": 0, "found": 0}
+    threading.Thread(target=_album_enrich_worker, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "status": "pending", "total": total}
+
+
+@router.get("/albums/enrich-all/status/{job_id}")
+def albums_enrich_all_status(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.post("/albums/enrich-all/cancel/{job_id}")
+def albums_enrich_all_cancel(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job["cancelled"] = True
+    return {"cancelled": True}
+
+
+@router.post("/artists/enrich-all", status_code=202)
+def artists_enrich_all(db: Session = Depends(get_db)):
+    total = db.query(models.Artist).filter(models.Artist.image_url.is_(None)).count()
+    job_id = str(uuid_lib.uuid4())
+    _enrich_jobs[job_id] = {"status": "pending", "total": total, "processed": 0, "found": 0}
+    threading.Thread(target=_artist_enrich_worker, args=(job_id,), daemon=True).start()
+    return {"job_id": job_id, "status": "pending", "total": total}
+
+
+@router.get("/artists/enrich-all/status/{job_id}")
+def artists_enrich_all_status(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.post("/artists/enrich-all/cancel/{job_id}")
+def artists_enrich_all_cancel(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job["cancelled"] = True
+    return {"cancelled": True }
 
 
 # ---------------------------------------------------------------------------

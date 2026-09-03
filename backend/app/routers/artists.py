@@ -27,6 +27,7 @@ def _load_song(db: Session, song_id: UUID) -> models.Song:
 def list_artists(
     search: Optional[str] = Query(None),
     country: Optional[str] = Query(None),
+    letter: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -36,6 +37,11 @@ def list_artists(
         q = q.filter(models.Artist.name.ilike(f"%{search}%"))
     if country:
         q = q.filter(models.Artist.country.ilike(f"%{country}%"))
+    if letter:
+        if letter == '#':
+            q = q.filter(~models.Artist.name.op('~')('^[A-Za-z]'))
+        else:
+            q = q.filter(models.Artist.name.ilike(f"{letter}%"))
     total = q.count()
     items = (
         q.order_by(models.Artist.name)

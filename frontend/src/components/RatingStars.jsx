@@ -77,7 +77,7 @@ export default function RatingStars({
               transition-all duration-150
               focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-1 focus:ring-offset-[#1a1a24]
               ${readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95'}
-              touch-target
+              ${size !== 'sm' ? 'touch-target' : ''}
             `}
             aria-label={`${star * 2} out of 10 stars`}
             aria-pressed={isFilled}

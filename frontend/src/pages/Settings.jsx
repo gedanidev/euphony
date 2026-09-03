@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import i18n from '../i18n/index.js'
 import { getSpotifyLoginUrl, getSpotifyStatus, syncSpotify } from '../api/auth'
 import { walkmanSyncStart, walkmanSyncStatus } from '../api/walkman'
+import { enrichAllAlbums, enrichAllAlbumsStatus, enrichAllArtists, enrichAllArtistsStatus, cancelEnrichAlbums, cancelEnrichArtists } from '../api/enrich'
 
 export default function Settings() {
   const { t } = useTranslation()
@@ -24,6 +25,16 @@ export default function Settings() {
   const [walkmanSyncing, setWalkmanSyncing] = useState(false)
   const [walkmanSyncResult, setWalkmanSyncResult] = useState(null)
   const [walkmanProgress, setWalkmanProgress] = useState(null)
+
+  const [albumEnriching, setAlbumEnriching] = useState(false)
+  const [albumEnrichProgress, setAlbumEnrichProgress] = useState(null)
+  const [albumEnrichResult, setAlbumEnrichResult] = useState(null)
+  const [albumEnrichJobId, setAlbumEnrichJobId] = useState(null)
+
+  const [artistEnriching, setArtistEnriching] = useState(false)
+  const [artistEnrichProgress, setArtistEnrichProgress] = useState(null)
+  const [artistEnrichResult, setArtistEnrichResult] = useState(null)
+  const [artistEnrichJobId, setArtistEnrichJobId] = useState(null)
 
   // Check URL params for connection result
   useEffect(() => {
@@ -107,6 +118,64 @@ export default function Settings() {
       setWalkmanSyncing(false)
       setWalkmanProgress(null)
       setWalkmanSyncResult({ error: e.response?.data?.detail || 'Error al iniciar sync' })
+    }
+  }
+
+  const handleEnrichAlbums = async () => {
+    setAlbumEnriching(true); setAlbumEnrichResult(null); setAlbumEnrichProgress(null); setAlbumEnrichJobId(null)
+    try {
+      const { job_id, total } = await enrichAllAlbums()
+      setAlbumEnrichJobId(job_id)
+      setAlbumEnrichProgress({ processed: 0, found: 0, total })
+      const poll = setInterval(async () => {
+        try {
+          const job = await enrichAllAlbumsStatus(job_id)
+          if (job.status === 'running' || job.status === 'pending') {
+            setAlbumEnrichProgress({ processed: job.processed ?? 0, found: job.found ?? 0, total: job.total ?? total })
+          } else if (job.status === 'done') {
+            clearInterval(poll); setAlbumEnriching(false); setAlbumEnrichProgress(null); setAlbumEnrichJobId(null)
+            setAlbumEnrichResult({ found: job.found, total: job.total })
+          } else if (job.status === 'cancelled') {
+            clearInterval(poll); setAlbumEnriching(false); setAlbumEnrichProgress(null); setAlbumEnrichJobId(null)
+            setAlbumEnrichResult({ cancelled: true, found: job.found, processed: job.processed })
+          } else if (job.status === 'error') {
+            clearInterval(poll); setAlbumEnriching(false); setAlbumEnrichProgress(null); setAlbumEnrichJobId(null)
+            setAlbumEnrichResult({ error: job.error || 'Error desconocido' })
+          }
+        } catch { clearInterval(poll); setAlbumEnriching(false); setAlbumEnrichProgress(null); setAlbumEnrichJobId(null) }
+      }, 3000)
+    } catch (e) {
+      setAlbumEnriching(false)
+      setAlbumEnrichResult({ error: e.response?.data?.detail || 'Error al iniciar' })
+    }
+  }
+
+  const handleEnrichArtists = async () => {
+    setArtistEnriching(true); setArtistEnrichResult(null); setArtistEnrichProgress(null); setArtistEnrichJobId(null)
+    try {
+      const { job_id, total } = await enrichAllArtists()
+      setArtistEnrichJobId(job_id)
+      setArtistEnrichProgress({ processed: 0, found: 0, total })
+      const poll = setInterval(async () => {
+        try {
+          const job = await enrichAllArtistsStatus(job_id)
+          if (job.status === 'running' || job.status === 'pending') {
+            setArtistEnrichProgress({ processed: job.processed ?? 0, found: job.found ?? 0, total: job.total ?? total })
+          } else if (job.status === 'done') {
+            clearInterval(poll); setArtistEnriching(false); setArtistEnrichProgress(null); setArtistEnrichJobId(null)
+            setArtistEnrichResult({ found: job.found, total: job.total })
+          } else if (job.status === 'cancelled') {
+            clearInterval(poll); setArtistEnriching(false); setArtistEnrichProgress(null); setArtistEnrichJobId(null)
+            setArtistEnrichResult({ cancelled: true, found: job.found, processed: job.processed })
+          } else if (job.status === 'error') {
+            clearInterval(poll); setArtistEnriching(false); setArtistEnrichProgress(null); setArtistEnrichJobId(null)
+            setArtistEnrichResult({ error: job.error || 'Error desconocido' })
+          }
+        } catch { clearInterval(poll); setArtistEnriching(false); setArtistEnrichProgress(null); setArtistEnrichJobId(null) }
+      }, 3000)
+    } catch (e) {
+      setArtistEnriching(false)
+      setArtistEnrichResult({ error: e.response?.data?.detail || 'Error al iniciar' })
     }
   }
 
@@ -266,6 +335,89 @@ export default function Settings() {
           {walkmanSyncResult?.error && (
             <p className="text-sm text-red-400 mt-2">{walkmanSyncResult.error}</p>
           )}
+        </div>
+      </div>
+
+      {/* Batch Enrich */}
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl p-6 mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+            <span className="text-purple-400 font-bold text-sm">MB</span>
+          </div>
+          <div>
+            <h2 className="font-semibold">Enriquecimiento masivo</h2>
+            <p className="text-xs text-[#94a3b8]">Descarga portadas y datos de MusicBrainz para toda la biblioteca (~1 seg por ítem)</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Albums */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={handleEnrichAlbums} disabled={albumEnriching}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                {albumEnriching && (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                )}
+                {albumEnriching ? 'Buscando portadas…' : 'Portadas de álbumes'}
+              </button>
+              {albumEnriching && albumEnrichJobId && (
+                <button onClick={() => cancelEnrichAlbums(albumEnrichJobId)}
+                  className="px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition-colors">
+                  Cancelar
+                </button>
+              )}
+              {albumEnriching && albumEnrichProgress && (
+                <span className="text-sm text-[#94a3b8]">
+                  {albumEnrichProgress.processed.toLocaleString()} / {albumEnrichProgress.total.toLocaleString()} · {albumEnrichProgress.found} encontradas
+                </span>
+              )}
+            </div>
+            {albumEnrichResult && !albumEnrichResult.error && !albumEnrichResult.cancelled && (
+              <p className="text-sm text-green-400">Listo — {albumEnrichResult.found} portadas encontradas de {albumEnrichResult.total} álbumes</p>
+            )}
+            {albumEnrichResult?.cancelled && (
+              <p className="text-sm text-amber-400">Cancelado — {albumEnrichResult.found} portadas guardadas hasta ahora ({albumEnrichResult.processed} procesados)</p>
+            )}
+            {albumEnrichResult?.error && <p className="text-sm text-red-400">{albumEnrichResult.error}</p>}
+          </div>
+
+          {/* Artists */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={handleEnrichArtists} disabled={artistEnriching}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                {artistEnriching && (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                )}
+                {artistEnriching ? 'Buscando imágenes…' : 'Imágenes de artistas'}
+              </button>
+              {artistEnriching && artistEnrichJobId && (
+                <button onClick={() => cancelEnrichArtists(artistEnrichJobId)}
+                  className="px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-sm transition-colors">
+                  Cancelar
+                </button>
+              )}
+              {artistEnriching && artistEnrichProgress && (
+                <span className="text-sm text-[#94a3b8]">
+                  {artistEnrichProgress.processed.toLocaleString()} / {artistEnrichProgress.total.toLocaleString()} · {artistEnrichProgress.found} encontradas
+                </span>
+              )}
+            </div>
+            {artistEnrichResult && !artistEnrichResult.error && !artistEnrichResult.cancelled && (
+              <p className="text-sm text-green-400">Listo — {artistEnrichResult.found} imágenes encontradas de {artistEnrichResult.total} artistas</p>
+            )}
+            {artistEnrichResult?.cancelled && (
+              <p className="text-sm text-amber-400">Cancelado — {artistEnrichResult.found} imágenes guardadas hasta ahora ({artistEnrichResult.processed} procesados)</p>
+            )}
+            {artistEnrichResult?.error && <p className="text-sm text-red-400">{artistEnrichResult.error}</p>}
+          </div>
         </div>
       </div>
 

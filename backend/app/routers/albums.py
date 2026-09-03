@@ -28,6 +28,7 @@ def list_albums(
     search: Optional[str] = Query(None),
     artist_id: Optional[UUID] = Query(None),
     year: Optional[int] = Query(None),
+    letter: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -39,6 +40,11 @@ def list_albums(
         q = q.filter(models.Album.artist_id == artist_id)
     if year:
         q = q.filter(models.Album.year == year)
+    if letter:
+        if letter == '#':
+            q = q.filter(~models.Album.title.op('~')('^[A-Za-z]'))
+        else:
+            q = q.filter(models.Album.title.ilike(f"{letter}%"))
     total = q.count()
     items = (
         q.order_by(models.Album.title)

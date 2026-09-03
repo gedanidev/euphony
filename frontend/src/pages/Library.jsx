@@ -429,7 +429,13 @@ export default function Library() {
   const [sortDir, setSortDir] = useState('asc')
   const [moods, setMoods] = useState([])
   const limit = 100
-  const [page, setPage] = useState(1)
+  const [page, setPageState] = useState(() => parseInt(sessionStorage.getItem('library-page') || '1', 10))
+  const setPage = (v) => setPageState(prev => {
+    const next = typeof v === 'function' ? v(prev) : v
+    sessionStorage.setItem('library-page', String(next))
+    return next
+  })
+  const filtersReady = useRef(false)
 
   const [songModal, setSongModal] = useState(null)
   const [addToPlaylist, setAddToPlaylist] = useState(null)
@@ -458,7 +464,10 @@ export default function Library() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { setPage(1) }, [search, availability, filterMood, walkmanFilter, sortBy, sortDir])
+  useEffect(() => {
+    if (!filtersReady.current) { filtersReady.current = true; return }
+    setPage(1)
+  }, [search, availability, filterMood, walkmanFilter, sortBy, sortDir])
   useEffect(() => { load() }, [page, search, availability, filterMood, walkmanFilter, sortBy, sortDir])
 
   const handleDelete = async (id) => {
@@ -734,14 +743,13 @@ export default function Library() {
           </button>
           <div className="flex items-center gap-1.5 text-sm text-[#94a3b8]">
             <input
+              key={page}
               type="number"
               min={1}
               max={Math.ceil(total / limit)}
-              value={page}
-              onChange={e => {
-                const v = parseInt(e.target.value, 10)
-                if (v >= 1 && v <= Math.ceil(total / limit)) setPage(v)
-              }}
+              defaultValue={page}
+              onBlur={e => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= Math.ceil(total / limit)) setPage(v) }}
+              onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= Math.ceil(total / limit)) { setPage(v); e.target.blur() } } }}
               className="w-14 text-center bg-[#1a1a24] border border-[#2e2e4a] rounded-lg py-1 text-[#e2e8f0] focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <span>/ {Math.ceil(total / limit)}</span>
