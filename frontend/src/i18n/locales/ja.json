@@ -210,5 +210,25 @@
   "artist.preferred": "好きなアーティスト",
   "common.yes": "はい",
   "common.no": "いいえ",
-  "common.name": "名前"
+  "common.name": "名前",
+
+  "shazam.searchTitle": "Shazamで検索",
+  "shazam.searchPlaceholder": "タイトルまたはアーティストで検索...",
+  "shazam.searching": "検索中...",
+  "shazam.results": "結果",
+  "shazam.noResults": "結果が見つかりませんでした",
+  "shazam.addToWishlist": "ウィッシュリストに追加",
+  "shazam.alreadyInLibrary": "すでにライブラリにあります",
+  "shazam.addConfirmTitle": "ウィッシュリストに追加しますか？",
+  "shazam.addConfirmDesc": "{{artist}}の{{title}}をウィッシュリストに追加しますか？",
+  "shazam.addedSuccess": "ウィッシュリストに追加しました",
+  "shazam.addError": "追加エラー",
+  "shazam.close": "閉じる",
+  "shazam.apiError": "Shazam APIエラー",
+  "shazam.apiNotConfigured": "APIキーが設定されていません",
+  "shazam.wishlistTitle": "曲を見つけましたか？",
+  "shazam.wishlistDesc": "Shazamで検索して、ウィッシュリストに直接追加",
+  "shazam.searchButton": "Shazamで検索",
+  "shazam.emptyWishlistTitle": "ウィッシュリストが空です",
+  "shazam.emptyWishlistDesc": "Shazamで曲を検索するか、手動で追加して始めてください"
 }
