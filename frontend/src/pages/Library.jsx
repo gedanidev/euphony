@@ -11,7 +11,6 @@ import LyricsModal from '../components/LyricsModal'
 import ErrorState from '../components/ErrorState'
 import RatingStars from '../components/RatingStars'
 import SongEditModal from '../components/SongEditModal'
-import ShazamSearch from '../components/ShazamSearch'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -447,7 +446,6 @@ export default function Library() {
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false)
   const [editSong, setEditSong] = useState(null)
   const [showBulkPlaylist, setShowBulkPlaylist] = useState(false)
-  const [showShazamSearch, setShowShazamSearch] = useState(false)
 
   useEffect(() => {
     getMoods().then(setMoods).catch(() => {})
@@ -659,23 +657,9 @@ export default function Library() {
 
       {!loading && !error && songs.length === 0 && (
         <EmptyState
-          title={availability === 'wishlist' ? t('shazam.emptyWishlistTitle') : t('library.empty.title')}
-          description={availability === 'wishlist' ? t('shazam.emptyWishlistDesc') : availability ? t('library.empty.filtered') : t('library.empty.desc')}
-          action={availability === 'wishlist' ? (
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={() => setShowShazamSearch(true)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-                </svg>
-                {t('shazam.searchButton')}
-              </button>
-              <button onClick={() => setSongModal({ mode: 'create' })}
-                className="px-4 py-2 bg-[#2e2e4a] hover:bg-[#3d3d5c] text-white rounded-lg text-sm transition-colors">
-                {t('library.addSong')}
-              </button>
-            </div>
-          ) : !availability ? (
+          title={t('library.empty.title')}
+          description={availability ? t('library.empty.filtered') : t('library.empty.desc')}
+          action={!availability ? (
             <button onClick={() => setSongModal({ mode: 'create' })}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
               {t('library.addSong')}
@@ -821,17 +805,6 @@ export default function Library() {
           songIds={[...selected]}
           onClose={() => setShowBulkPlaylist(false)}
           onSaved={() => { setShowBulkPlaylist(false); setSelected(new Set()) }}
-        />
-      )}
-
-      {showShazamSearch && (
-        <ShazamSearch
-          onSongAdded={(song) => {
-            setShowShazamSearch(false)
-            load() // Refresh the list
-          }}
-          onClose={() => setShowShazamSearch(false)}
-          library={songs}
         />
       )}
 
