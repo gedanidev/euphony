@@ -26,14 +26,21 @@ export default function AlbumDetail() {
   const [coverCandidates, setCoverCandidates] = useState([])
   const [editSong, setEditSong] = useState(null)
 
-  useEffect(() => {
+  const load = async () => {
     setLoading(true)
     setError(null)
-    getAlbum(id)
-      .then(a => { setAlbum(a); setSongs(a.songs || []) })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [id])
+    try {
+      const a = await getAlbum(id)
+      setAlbum(a)
+      setSongs(a.songs || [])
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [id])
 
   const handleRating = async (rating) => {
     const updated = await setAlbumRating(id, rating)
@@ -51,7 +58,7 @@ export default function AlbumDetail() {
   }
 
   if (loading) return <div className="p-6"><LoadingSpinner /></div>
-  if (error) return <div className="p-6"><ErrorState message={error} onRetry={() => window.location.reload()} /></div>
+  if (error) return <div className="p-6"><ErrorState message={error} onRetry={load} /></div>
   if (!album) return null
 
   const totalDuration = songs.reduce((acc, s) => acc + (s.duration || 0), 0)

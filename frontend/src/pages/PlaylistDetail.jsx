@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   DndContext,
   closestCenter,
@@ -78,6 +79,7 @@ function SortableRow({ item, index, onRemove }) {
 // ── Add Songs Modal ───────────────────────────────────────────────────────────
 
 function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
+  const { t } = useTranslation()
   const [songs, setSongs]     = useState([])
   const [search, setSearch]   = useState('')
   const [selected, setSelected] = useState(new Set())
@@ -102,7 +104,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
     try {
       await addSongsToPlaylist(playlistId, [...selected])
       onAdded()
-    } catch { alert('Error adding songs') }
+    } catch { alert('Error agregando canciones') }
     finally { setAdding(false) }
   }
 
@@ -110,7 +112,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         <div className="p-4 border-b border-[#2e2e4a] flex items-center justify-between">
-          <h2 className="font-semibold">Add Songs</h2>
+          <h2 className="font-semibold">{t('playlistDetail.addSongs') || 'Agregar canciones'}</h2>
           <button onClick={onClose} className="text-[#94a3b8] hover:text-white">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -121,7 +123,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
           <input
             autoFocus
             type="text"
-            placeholder="Search songs…"
+            placeholder={t('playlistDetail.searchSongs') || 'Buscar canciones…'}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
@@ -129,7 +131,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
         </div>
         <div className="flex-1 overflow-y-auto">
           {loading ? <LoadingSpinner /> : songs.length === 0 ? (
-            <div className="py-12 text-center text-[#94a3b8] text-sm">No songs found</div>
+            <div className="py-12 text-center text-[#94a3b8] text-sm">{t('playlistDetail.noSongsFound') || 'No se encontraron canciones'}</div>
           ) : (
             <table className="w-full">
               <tbody>
@@ -167,15 +169,15 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
           )}
         </div>
         <div className="p-4 border-t border-[#2e2e4a] flex items-center justify-between">
-          <span className="text-sm text-[#94a3b8]">{selected.size} selected</span>
+          <span className="text-sm text-[#94a3b8]">{selected.size} {t('playlistDetail.selected') || 'seleccionadas'}</span>
           <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-[#94a3b8] hover:text-white transition-colors">Cancel</button>
+            <button onClick={onClose} className="px-4 py-2 text-sm text-[#94a3b8] hover:text-white transition-colors">{t('common.cancel') || 'Cancelar'}</button>
             <button
               onClick={handleAdd}
               disabled={!selected.size || adding}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              {adding ? 'Adding…' : `Add ${selected.size > 0 ? selected.size + ' ' : ''}Song${selected.size !== 1 ? 's' : ''}`}
+              {adding ? (t('common.adding') || 'Agregando…') : `${t('common.add') || 'Agregar'} ${selected.size > 0 ? selected.size + ' ' : ''}${selected.size !== 1 ? (t('common.songs') || 'canciones') : (t('common.song') || 'canción')}`}
             </button>
           </div>
         </div>
@@ -189,6 +191,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
 export default function PlaylistDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const [playlist, setPlaylist]   = useState(null)
   const [items, setItems]         = useState([])
@@ -233,7 +236,7 @@ export default function PlaylistDetail() {
     try {
       const data = await removeSongFromPlaylist(id, songId)
       setItems(data.songs)
-    } catch { alert('Error removing song') }
+    } catch { alert('Error eliminando canción') }
   }
 
   const handleSaveEdit = async () => {
@@ -241,11 +244,11 @@ export default function PlaylistDetail() {
       await updatePlaylist(id, editForm)
       setPlaylist(p => ({ ...p, ...editForm }))
       setEditing(false)
-    } catch { alert('Error updating playlist') }
+    } catch { alert('Error actualizando playlist') }
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this playlist?')) return
+    if (!confirm(t('playlistDetail.deleteConfirm') || '¿Eliminar esta playlist?')) return
     await deletePlaylist(id)
     navigate('/playlists')
   }
@@ -257,7 +260,7 @@ export default function PlaylistDetail() {
       const a    = document.createElement('a')
       a.href = url; a.download = `${playlist.name}.${format}`; a.click()
       URL.revokeObjectURL(url)
-    } catch { alert('Export failed') }
+    } catch { alert('Error al exportar') }
   }
 
   if (loading) return <div className="p-6"><LoadingSpinner /></div>
@@ -274,7 +277,7 @@ export default function PlaylistDetail() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Playlists
+            {t('playlists.title') || 'Playlists'}
           </button>
 
           {editing ? (
@@ -288,12 +291,12 @@ export default function PlaylistDetail() {
               <input
                 value={editForm.description || ''}
                 onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Description"
+                placeholder={t('playlistDetail.descriptionPlaceholder') || 'Descripción'}
                 className="block text-sm bg-[#1a1a24] border border-[#2e2e4a] rounded-lg px-3 py-1 text-[#94a3b8] focus:outline-none focus:border-purple-500"
               />
               <div className="flex gap-2">
-                <button onClick={handleSaveEdit} className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">Save</button>
-                <button onClick={() => setEditing(false)} className="px-3 py-1 text-[#94a3b8] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={handleSaveEdit} className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">{t('common.save') || 'Guardar'}</button>
+                <button onClick={() => setEditing(false)} className="px-3 py-1 text-[#94a3b8] hover:text-white text-sm transition-colors">{t('common.cancel') || 'Cancelar'}</button>
               </div>
             </div>
           ) : (
@@ -311,7 +314,7 @@ export default function PlaylistDetail() {
                 </button>
               </h1>
               {playlist.description && <p className="text-[#94a3b8] text-sm mt-1">{playlist.description}</p>}
-              <p className="text-[#94a3b8] text-sm mt-1">{items.length} {items.length === 1 ? 'song' : 'songs'}</p>
+              <p className="text-[#94a3b8] text-sm mt-1">{items.length} {items.length === 1 ? (t('common.song') || 'canción') : (t('common.songs') || 'canciones')}</p>
             </>
           )}
         </div>
@@ -320,7 +323,7 @@ export default function PlaylistDetail() {
           {/* Export dropdown */}
           <div className="relative group">
             <button className="px-3 py-2 bg-[#1a1a24] border border-[#2e2e4a] hover:border-purple-500/50 text-[#94a3b8] hover:text-white rounded-lg text-sm transition-colors">
-              Export ▾
+              {t('common.export') || 'Exportar'} ▾
             </button>
             <div className="absolute right-0 top-full mt-1 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg overflow-hidden hidden group-hover:block z-10 min-w-[80px]">
               <button onClick={() => handleExport('json')} className="block w-full px-4 py-2 text-sm text-left hover:bg-[#22223a] text-[#e2e8f0]">JSON</button>
@@ -332,11 +335,11 @@ export default function PlaylistDetail() {
             onClick={() => setShowAdd(true)}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            + Add Songs
+            + {t('playlistDetail.addSongs') || 'Agregar canciones'}
           </button>
 
           <button onClick={handleDelete} className="px-3 py-2 text-red-400/50 hover:text-red-400 text-sm transition-colors">
-            Delete
+            {t('common.delete') || 'Eliminar'}
           </button>
         </div>
       </div>
@@ -344,11 +347,11 @@ export default function PlaylistDetail() {
       {/* Songs table */}
       {items.length === 0 ? (
         <EmptyState
-          title="No songs in this playlist"
-          description="Add songs from your library"
+          title={t('playlistDetail.emptyTitle') || 'Sin canciones'}
+          description={t('playlistDetail.emptyDesc') || 'Agrega canciones desde tu biblioteca'}
           action={
             <button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors">
-              Add Songs
+              {t('playlistDetail.addSongs') || 'Agregar canciones'}
             </button>
           }
         />
@@ -360,11 +363,11 @@ export default function PlaylistDetail() {
                 <tr className="border-b border-[#2e2e4a] text-[#94a3b8] text-xs uppercase tracking-wider">
                   <th className="px-3 py-3 w-8" />
                   <th className="px-3 py-3 w-10">#</th>
-                  <th className="px-3 py-3">Title</th>
-                  <th className="px-3 py-3">Artist</th>
-                  <th className="px-3 py-3">Album</th>
-                  <th className="px-3 py-3">Year</th>
-                  <th className="px-3 py-3 text-right">Duration</th>
+                  <th className="px-3 py-3">{t('library.col.title') || 'Título'}</th>
+                  <th className="px-3 py-3">{t('library.col.artist') || 'Artista'}</th>
+                  <th className="px-3 py-3">{t('library.col.album') || 'Álbum'}</th>
+                  <th className="px-3 py-3">{t('library.col.year') || 'Año'}</th>
+                  <th className="px-3 py-3 text-right">{t('library.col.duration') || 'Duración'}</th>
                   <th className="px-3 py-3 w-8" />
                 </tr>
               </thead>

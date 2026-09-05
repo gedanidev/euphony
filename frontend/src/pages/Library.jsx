@@ -11,6 +11,7 @@ import LyricsModal from '../components/LyricsModal'
 import ErrorState from '../components/ErrorState'
 import RatingStars from '../components/RatingStars'
 import SongEditModal from '../components/SongEditModal'
+import ResponsiveTable from '../components/ResponsiveTable'
 
 function fmt(seconds) {
   if (!seconds) return '--:--'
@@ -542,24 +543,128 @@ export default function Library() {
     else { setSortBy(col); setSortDir('asc') }
   }
 
-  const SortTh = ({ col, label, className = '' }) => {
-    const active = sortBy === col
-    return (
-      <th className={`px-4 py-3 cursor-pointer select-none hover:text-white transition-colors ${active ? 'text-white' : ''} ${className}`}
-        onClick={() => toggleSort(col)}>
-        <span className="flex items-center gap-1">
-          {label}
-          <span className="text-xs opacity-60">
-            {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-          </span>
-        </span>
-      </th>
-    )
-  }
+  const songColumns = [
+    { key: 'title', label: t('library.col.title'), sortable: true },
+    { 
+      key: 'artist', 
+      label: t('library.col.artist'), 
+      sortable: false,
+      render: (song) => song.artist_display || '—'
+    },
+    { 
+      key: 'album', 
+      label: t('library.col.album'), 
+      sortable: false,
+      render: (song) => song.album?.title || '—'
+    },
+    { 
+      key: 'year', 
+      label: t('library.col.year'), 
+      sortable: false,
+      className: 'text-[#64748b]',
+      render: (song) => song.year || '—'
+    },
+    { 
+      key: 'availability', 
+      label: t('library.col.status'), 
+      sortable: false,
+      render: (song) => <AvailabilityBadge value={song.availability} />
+    },
+    { 
+      key: 'duration', 
+      label: t('library.col.duration'), 
+      sortable: false,
+      className: 'text-right tabular-nums text-[#64748b]',
+      render: (song) => fmt(song.duration)
+    },
+    { 
+      key: 'rating', 
+      label: '', 
+      sortable: false,
+      className: 'w-24',
+      render: (song) => (
+        <RatingStars
+          rating={song.rating || null}
+          onChange={(r) => handleRating(song.id, r)}
+          compact
+          size="sm"
+        />
+      )
+    },
+  ]
+
+  // Row actions renderer
+  const songRowActions = (song) => (
+    <RowActionsMenu
+      song={song}
+      enriching={enriching === song.id}
+      onFavorite={() => handleFavorite(song.id)}
+      onAddToPlaylist={() => setAddToPlaylist(song.id)}
+      onEditSong={() => setEditSong(song)}
+      onLyrics={() => setLyricsModal(song)}
+      onEnrich={() => handleEnrich(song.id)}
+      onEdit={() => setSongModal({ mode: 'edit', song })}
+      onDelete={() => handleDelete(song.id)}
+    />
+  )
+
+  // Custom mobile card renderer for better song display
+  const songMobileCard = ({ item: song, isSelected, onSelect }) => (
+    <div className={`bg-[#13131a] border border-[#2e2e4a] rounded-xl overflow-hidden mb-3 shadow-sm ${isSelected ? 'ring-2 ring-purple-500/50 bg-purple-900/10' : ''}`}>
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="pt-1">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onSelect}
+              className="w-5 h-5 rounded border-[#2e2e4a] bg-[#0f0f13] accent-purple-600 cursor-pointer touch-target"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            {/* Title - primary */}
+            <div className="font-semibold text-white text-lg leading-tight truncate">
+              {song.title}
+            </div>
+            {/* Artist & Album */}
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-sm">
+              <span className="text-[#e2e8f0] font-medium truncate">
+                {song.artist_display || 'Sin artista'}
+              </span>
+              {song.album?.title && (
+                <>
+                  <span className="text-[#475569]">·</span>
+                  <span className="text-[#64748b] truncate">{song.album.title}</span>
+                </>
+              )}
+            </div>
+            {/* Metadata row */}
+            <div className="flex items-center gap-3 mt-2">
+              <AvailabilityBadge value={song.availability} />
+              {song.year && (
+                <span className="text-xs text-[#64748b]">{song.year}</span>
+              )}
+              <span className="text-xs text-[#64748b] tabular-nums">{fmt(song.duration)}</span>
+              <div className="flex-1" />
+              <RatingStars
+                rating={song.rating || null}
+                onChange={(r) => handleRating(song.id, r)}
+                compact
+                size="sm"
+              />
+            </div>
+          </div>
+          <div className="-mr-1">
+            {songRowActions(song)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t('library.title')}</h1>
         <div className="flex items-center gap-2">
           <button
@@ -581,7 +686,7 @@ export default function Library() {
       </div>
 
       {/* Availability tabs */}
-      <div className="flex gap-1 mb-4">
+      <div className="flex flex-wrap gap-1 mb-4">
         {AVAILABILITY_TABS.map(tab => (
           <button key={tab.key} onClick={() => setAvailability(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${availability === tab.key
@@ -599,7 +704,7 @@ export default function Library() {
           placeholder={t('library.search')}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
+          className="w-full sm:w-64 px-4 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
         />
         <select value={filterMood} onChange={e => setFilterMood(e.target.value)}
           className="px-3 py-2 bg-[#1a1a24] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500">
@@ -669,69 +774,27 @@ export default function Library() {
       )}
 
       {!loading && !error && songs.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-[#2e2e4a]" style={{ maxHeight: 'calc(100dvh - 280px)', overflowY: 'auto' }}>
-          <table className="w-full min-w-[700px] text-left bg-[#1a1a24]">
-              <thead className="sticky top-0 z-10 bg-[#1a1a24]">
-                <tr className="border-b border-[#2e2e4a] text-[#94a3b8] text-xs uppercase tracking-wider">
-                  <th className="px-3 py-3 w-8">
-                    <input type="checkbox"
-                      className="rounded border-[#2e2e4a] bg-[#0f0f13] accent-purple-600 cursor-pointer"
-                      checked={songs.length > 0 && songs.every(s => selected.has(s.id))}
-                      onChange={e => e.target.checked ? selectAll() : clearSelection()}
-                    />
-                  </th>
-                  <SortTh col="title" label={t('library.col.title')} />
-                  <SortTh col="artist" label={t('library.col.artist')} />
-                  <SortTh col="album" label={t('library.col.album')} />
-                  <th className="px-4 py-3">{t('library.col.year')}</th>
-                  <th className="px-4 py-3">{t('library.col.status')}</th>
-                  <th className="px-4 py-3 text-right">{t('library.col.duration')}</th>
-                  <th className="px-2 py-3 w-24" />
-                  <th className="px-2 py-3 w-20" />
-                </tr>
-              </thead>
-              <tbody>
-                {songs.map(song => (
-                  <tr key={song.id} className={`border-b border-[#2e2e4a] hover:bg-[#22223a]/40 group text-sm ${selected.has(song.id) ? 'bg-purple-900/10' : ''}`}>
-                    <td className="px-3 py-2">
-                      <input type="checkbox"
-                        className="rounded border-[#2e2e4a] bg-[#0f0f13] accent-purple-600 cursor-pointer"
-                        checked={selected.has(song.id)}
-                        onChange={() => toggleSelect(song.id)}
-                      />
-                    </td>
-                    <td className="px-4 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
-                    <td className="px-4 py-2 text-[#94a3b8]">{song.artist_display || '—'}</td>
-                    <td className="px-4 py-2 text-[#94a3b8]">{song.album?.title || '—'}</td>
-                    <td className="px-4 py-2 text-[#94a3b8]">{song.year || '—'}</td>
-                    <td className="px-4 py-2"><AvailabilityBadge value={song.availability} /></td>
-                    <td className="px-4 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      <RatingStars
-                        rating={song.rating || null}
-                        onChange={(r) => handleRating(song.id, r)}
-                        compact
-                        size="sm"
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <RowActionsMenu
-                        song={song}
-                        enriching={enriching === song.id}
-                        onFavorite={() => handleFavorite(song.id)}
-                        onAddToPlaylist={() => setAddToPlaylist(song.id)}
-                        onEditSong={() => setEditSong(song)}
-                        onLyrics={() => setLyricsModal(song)}
-                        onEnrich={() => handleEnrich(song.id)}
-                        onEdit={() => setSongModal({ mode: 'edit', song })}
-                        onDelete={() => handleDelete(song.id)}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-        </div>
+        <ResponsiveTable
+          columns={songColumns}
+          data={songs}
+          keyExtractor={(song) => song.id}
+          rowActions={songRowActions}
+          selectable={true}
+          selected={selected}
+          onSelect={setSelected}
+          loading={false}
+          sortConfig={{ key: sortBy, direction: sortDir }}
+          onSort={(key) => {
+            if (sortBy === key) {
+              setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+            } else {
+              setSortBy(key)
+              setSortDir('asc')
+            }
+          }}
+          mobileCardRender={songMobileCard}
+          maxHeight="calc(100dvh - 320px)"
+        />
       )}
 
       {/* Pagination */}
