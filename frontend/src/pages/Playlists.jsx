@@ -185,11 +185,19 @@ function SmartTab() {
 
 export default function Playlists() {
   const [playlists, setPlaylists] = useState([])
+  const [total, setTotal]         = useState(0)
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
   const [search, setSearch]       = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [tab, setTab]             = useState('normal')
+  const limit = 48
+  const [page, setPageState] = useState(() => parseInt(sessionStorage.getItem('playlists-page') || '1', 10))
+  const setPage = (v) => setPageState(prev => {
+    const next = typeof v === 'function' ? v(prev) : v
+    sessionStorage.setItem('playlists-page', String(next))
+    return next
+  })
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -197,8 +205,9 @@ export default function Playlists() {
     try {
       setLoading(true)
       setError(null)
-      const data = await getPlaylists({ search, limit: 100 })
+      const data = await getPlaylists({ search: search || undefined, page, limit })
       setPlaylists(data.items)
+      setTotal(data.total)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -206,7 +215,12 @@ export default function Playlists() {
     }
   }
 
-  useEffect(() => { load() }, [search])
+  useEffect(() => {
+    if (tab !== 'normal') return
+    setPage(1)
+  }, [search])
+
+  useEffect(() => { if (tab === 'normal') load() }, [search, page])
 
   const handleDelete = async (e, id) => {
     e.stopPropagation()
@@ -214,6 +228,8 @@ export default function Playlists() {
     await deletePlaylist(id)
     load()
   }
+
+  const totalPages = Math.ceil(total / limit)
 
   return (
     <div className="p-6">
@@ -300,6 +316,23 @@ export default function Playlists() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-6">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white transition-colors">{t('common.prev')}</button>
+              <input
+                key={page}
+                type="number" min={1} max={totalPages} defaultValue={page}
+                onBlur={e => { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) setPage(v) }}
+                onKeyDown={e => { if (e.key === 'Enter') { const v = parseInt(e.target.value, 10); if (v >= 1 && v <= totalPages) { setPage(v); e.target.blur() } } }}
+                className="w-14 text-center bg-[#1a1a24] border border-[#2e2e4a] rounded-lg py-1 text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="text-[#94a3b8] text-sm">/ {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-3 py-1 rounded text-sm disabled:opacity-40 text-[#94a3b8] hover:text-white transition-colors">{t('common.next')}</button>
             </div>
           )}
 
