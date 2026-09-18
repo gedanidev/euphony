@@ -38,18 +38,9 @@ export default function GenreEditor() {
     try {
       let res
       if (mode === 'artist') {
-        // Use artist songs endpoint
-        const artist = artists.find(a => a.id === selectedId)
-        if (!artist) return
-        // Get songs with this artist
         res = await getSongs({ artist_id: selectedId, limit: 10000 })
       } else {
-        // Get songs from album
-        const album = albums.find(a => a.id === selectedId)
-        if (!album) return
-        res = await getSongs({ availability: null, limit: 10000 })
-        // Filter by album client-side since API may not filter by album
-        res.items = res.items.filter(s => s.album_id === selectedId)
+        res = await getSongs({ album_id: selectedId, limit: 10000 })
       }
       setSongs(res.items || [])
       setSelectedSongs(new Set())
@@ -57,7 +48,7 @@ export default function GenreEditor() {
       console.error(e)
     }
     setLoading(false)
-  }, [mode, selectedId, artists, albums])
+  }, [mode, selectedId])
 
   useEffect(() => {
     loadSongs()

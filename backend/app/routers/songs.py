@@ -267,6 +267,7 @@ def list_songs(
     search: Optional[str] = Query(None),
     availability: Optional[str] = Query(None),
     artist_id: Optional[UUID] = Query(None),
+    album_id: Optional[UUID] = Query(None),
     mood_id: Optional[UUID] = Query(None),
     walkman_status: Optional[str] = Query(None),
     sort_by: Optional[str] = Query("title", regex="^(title|artist|album)$"),
@@ -297,6 +298,9 @@ def list_songs(
         q = q.join(models.SongArtist, models.SongArtist.song_id == models.Song.id).filter(
             models.SongArtist.artist_id == artist_id
         )
+
+    if album_id:
+        q = q.filter(models.Song.album_id == album_id)
 
     if mood_id:
         q = q.join(models.SongMood, models.SongMood.song_id == models.Song.id).filter(
