@@ -204,6 +204,11 @@ def _resolve_artist_genres(artist_name: str, cache: Optional[dict] = None) -> tu
         # 2. MusicBrainz (fallback)
         genres = _fetch_artist_genres_musicbrainz(artist_name)
 
+    # Both sources sometimes tag an artist with their own name (e.g. Last.fm
+    # users tagging "Metallica" tracks with the tag "metallica"). That's not
+    # a genre — drop it so it never becomes primary_genre for that artist.
+    genres = [g for g in genres if g != key]
+
     if cache is not None:
         cache[key] = genres
     return genres, False

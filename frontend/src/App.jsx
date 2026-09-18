@@ -11,7 +11,6 @@ import Artists from './pages/Artists'
 import ArtistDetail from './pages/ArtistDetail'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
-import Genres from './pages/Genres'
 import Moods from './pages/Moods'
 import Import from './pages/Import'
 import Settings from './pages/Settings'
@@ -41,7 +40,6 @@ export default function App() {
                 <Route path="/artists/:id" element={<ArtistDetail />} />
                 <Route path="/albums" element={<Albums />} />
                 <Route path="/albums/:id" element={<AlbumDetail />} />
-                <Route path="/genres" element={<Genres />} />
                 <Route path="/moods" element={<Moods />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/settings" element={<Settings />} />
