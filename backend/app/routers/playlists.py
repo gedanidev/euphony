@@ -175,6 +175,82 @@ async def import_playlist(
     )
 
 
+@router.post("/import-spotify", response_model=schemas.SpotifyPlaylistImportResult, status_code=201)
+def import_spotify_playlist(
+    data: schemas.SpotifyPlaylistImportRequest,
+    db: Session = Depends(get_db),
+):
+    """Import a playlist from Spotify by matching tracks against the local library."""
+    pl = models.Playlist(name=data.playlist_name, description=data.description or "")
+    db.add(pl)
+    db.flush()
+
+    matched = 0
+    unresolved = 0
+    unmatched_tracks = []
+
+    for i, track in enumerate(data.tracks):
+        song = None
+
+        # 1. Exact match by spotify_id
+        if track.spotify_id:
+            song = db.query(models.Song).filter(
+                models.Song.spotify_id == track.spotify_id
+            ).first()
+
+        # 2. Exact match by title + artist (case-insensitive)
+        if not song and track.title and track.artist:
+            song = (
+                db.query(models.Song)
+                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                .filter(
+                    models.Song.title.ilike(track.title),
+                    models.Artist.name.ilike(track.artist),
+                )
+                .first()
+            )
+
+        # 3. Fuzzy match: title contains search text AND artist contains search text
+        if not song and track.title and track.artist:
+            song = (
+                db.query(models.Song)
+                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                .filter(
+                    models.Song.title.ilike(f"%{track.title}%"),
+                    models.Artist.name.ilike(f"%{track.artist}%"),
+                )
+                .first()
+            )
+
+        ps = models.PlaylistSong(
+            playlist_id=pl.id,
+            song_id=song.id if song else None,
+            position=i,
+            raw_title=track.title or None,
+            raw_artist=track.artist or None,
+        )
+        db.add(ps)
+
+        if song:
+            matched += 1
+        else:
+            unresolved += 1
+            unmatched_tracks.append(track)
+
+    db.commit()
+
+    return schemas.SpotifyPlaylistImportResult(
+        playlist_id=pl.id,
+        playlist_name=data.playlist_name,
+        total=len(data.tracks),
+        matched=matched,
+        unresolved=unresolved,
+        unmatched_tracks=unmatched_tracks,
+    )
+
+
 @router.get("/{playlist_id}", response_model=schemas.PlaylistDetailRead)
 def get_playlist(playlist_id: UUID, db: Session = Depends(get_db)):
     pl = _load_detail(playlist_id, db)
@@ -270,6 +346,8 @@ def reorder_songs(playlist_id: UUID, data: schemas.ReorderRequest, db: Session =
 def export_playlist(
     playlist_id: UUID,
     format: str = Query("json", pattern="^(json|csv|m3u)$"),
+    relative: bool = Query(False, description="Generate relative paths for M3U export"),
+    base_path: Optional[str] = Query(None, description="Base path to strip for relative M3U paths"),
     db: Session = Depends(get_db),
 ):
     pl = _load_detail(playlist_id, db)
@@ -308,6 +386,19 @@ def export_playlist(
             if not path:
                 skipped += 1
                 continue
+
+            # Convert to relative path if requested
+            if relative and base_path:
+                import os
+                # Normalize paths for comparison
+                norm_path = os.path.normpath(path)
+                norm_base = os.path.normpath(base_path)
+                # Try to make relative
+                if norm_path.startswith(norm_base + os.sep):
+                    path = norm_path[len(norm_base) + 1:].replace(os.sep, "/")
+                elif norm_path.startswith(norm_base):
+                    path = norm_path[len(norm_base):].lstrip(os.sep).replace(os.sep, "/")
+
             duration = s.duration if s.duration else -1
             artist = s.artist_display or ""
             title = s.title or ""
