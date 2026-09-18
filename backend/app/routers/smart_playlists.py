@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import and_, or_
 import sqlalchemy as sa
@@ -224,4 +224,251 @@ def export_smart_playlist_m3u(playlist_id: UUID, db: Session = Depends(get_db)):
     return PlainTextResponse(
         content=content,
         headers={"Content-Disposition": f'attachment; filename="{filename}.m3u"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Genre-based Smart Playlist Creation
+# ---------------------------------------------------------------------------
+
+# Lista de tags "basura" conocidos de MusicBrainz/Last.fm que no son géneros
+_GARBAGE_TAGS = {
+    "special purpose artist",
+    "composer",
+    "conductor",
+    "non-music",
+    "unknown",
+    "various artists",
+    # NOTE: "soundtrack"/"original soundtrack"/"score"/"instrumental"/"acoustic"
+    # are deliberately NOT here — they're real style categories once a song
+    # already has them as primary_genre (e.g. film-score/cinematic music),
+    # not junk tags to filter out.
+    "live",
+    "remix",
+    "cover",
+    "karaoke",
+    "tribute",
+    "compilation",
+    "anthology",
+    "greatest hits",
+    "essential",
+    "best of",
+    "the best",
+    "complete",
+    "collector",
+    "deluxe",
+    "anniversary",
+    "remastered",
+    "reissue",
+    "bonus",
+    "explicit",
+    "clean",
+    "radio edit",
+    "single",
+    "ep",
+    "lp",
+    "album",
+    "mixtape",
+    "demo",
+    "unreleased",
+    "bootleg",
+    "promo",
+    "white label",
+    "unknown artist",
+    "no artist",
+    "untitled",
+}
+
+# Gentilicios/idiomas/países comunes que NO son géneros musicales
+_LANGUAGE_COUNTRY_TAGS = {
+    # Idiomas
+    "english", "spanish", "french", "german", "italian", "portuguese", "japanese",
+    "chinese", "korean", "russian", "dutch", "swedish", "norwegian", "danish",
+    "finnish", "polish", "czech", "hungarian", "greek", "turkish", "arabic",
+    "hebrew", "hindi", "urdu", "bengali", "thai", "vietnamese", "indonesian",
+    "malay", "tagalog", "swahili", "afrikaans", "catalan", "basque", "galician",
+    "welsh", "irish", "scottish", "breton", "luxembourgish", "icelandic",
+    "estonian", "latvian", "lithuanian", "slovak", "slovene", "croatian",
+    "serbian", "bosnian", "macedonian", "bulgarian", "romanian", "ukrainian",
+    "belarusian", "georgian", "armenian", "azerbaijani", "kazakh", "uzbek",
+    "kurdish", "persian", "pashto", "tamil", "telugu", "kannada", "malayalam",
+    "marathi", "gujarati", "punjabi", "sinhala", "burmese", "khmer", "lao",
+    "mongolian", "tibetan", "uyghur", "nepali", "sanskrit",
+    # NOTE: "latin" deliberately excluded from this language list — it's a
+    # real, widely-used music genre umbrella (reggaeton/salsa/tropical etc.),
+    # not just the language, and should stay eligible as a suggestion.
+    # Países
+    "american", "british", "canadian", "mexican", "colombian", "argentine",
+    "brazilian", "chilean", "peruvian", "venezuelan", "ecuadorian", "uruguayan",
+    "paraguayan", "bolivian", "cuban", "puerto rican", "dominican", "jamaican",
+    "haitian", "panamanian", "costa rican", "guatemalan", "honduran", "nicaraguan",
+    "salvadoran", "belizean", "spanish", "french", "german", "italian",
+    "portuguese", "dutch", "belgian", "swiss", "austrian", "swedish", "norwegian",
+    "danish", "finnish", "icelandic", "irish", "scottish", "welsh", "english",
+    "polish", "czech", "hungarian", "romanian", "bulgarian", "greek", "turkish",
+    "russian", "ukrainian", "belarusian", "lithuanian", "latvian", "estonian",
+    "slovak", "slovenian", "croatian", "serbian", "bosnian", "montenegrin",
+    "macedonian", "albanian", "kosovar", "moldovan", "georgian", "armenian",
+    "azerbaijani", "kazakh", "uzbek", "turkmen", "kyrgyz", "tajik", "mongolian",
+    "chinese", "japanese", "korean", "taiwanese", "hong kong", "singaporean",
+    "malaysian", "thai", "vietnamese", "indonesian", "filipino", "burmese",
+    "cambodian", "laotian", "indian", "pakistani", "bangladeshi", "sri lankan",
+    "nepali", "bhutanese", "maldivian", "afghan", "iranian", "iraqi", "syrian",
+    "lebanese", "jordanian", "israeli", "palestinian", "saudi", "kuwaiti",
+    "qatari", "bahraini", "emirati", "omani", "yemeni", "egyptian", "libyan",
+    "tunisian", "algerian", "moroccan", "mauritanian", "sudanese", "ethiopian",
+    "eritrean", "somali", "djiboutian", "kenyan", "tanzanian", "ugandan",
+    "rwandan", "burundian", "south sudanese", "chadian", "nigerian", "ghanaian",
+    "ivorian", "senegalese", "malian", "burkinabe", "nigerien", "beninese",
+    "togolese", "sierra leonean", "liberian", "guinean", "gambian", "guinea-bissauan",
+    "cape verdean", "sao tomean", "equatorial guinean", "gabonese", "congolese",
+    "central african", "cameroonian", "zambian", "zimbabwean", "malawian",
+    "mozambican", "angolan", "namibian", "botswanan", "south african", "lesotho",
+    "swazi", "comoran", "mauritian", "seychellois", "malagasy", "australian",
+    "new zealander", "papua new guinean", "fijian", "solomon islander", "vanuatu",
+    "new caledonian", "samoan", "tongan", "niuean", "cook islander", "tuvaluan",
+    "nauruan", "palauan", "marshallese", "micronesian", "kiribati", "tuvalu",
+    "iceland",
+    # Variantes específicas encontradas
+    "japan", "korea", "china", "mexico", "colombia", "argentina", "peru",
+    "venezuela", "chile", "ecuador", "uruguay", "paraguay", "bolivia",
+    "spain", "england", "france", "germany", "italy", "portugal", "netherlands",
+    "belgium", "switzerland", "austria", "sweden", "norway", "denmark",
+    "finland", "ireland", "scotland", "wales", "poland", "czech republic",
+    "hungary", "romania", "bulgaria", "greece", "turkey", "russia", "ukraine",
+    "belarus", "lithuania", "latvia", "estonia", "slovakia", "slovenia",
+    "croatia", "serbia", "bosnia", "macedonia", "albania", "moldova",
+    "georgia", "armenia", "azerbaijan", "kazakhstan", "uzbekistan",
+    "turkmenistan", "kyrgyzstan", "tajikistan", "mongolia", "china",
+    "taiwan", "hong kong", "singapore", "malaysia", "thailand", "vietnam",
+    "indonesia", "philippines", "myanmar", "cambodia", "laos", "india",
+    "pakistan", "bangladesh", "sri lanka", "nepal", "bhutan", "maldives",
+    "afghanistan", "iran", "iraq", "syria", "lebanon", "jordan", "israel",
+    "palestine", "saudi arabia", "kuwait", "qatar", "bahrain", "uae",
+    "oman", "yemen", "egypt", "libya", "tunisia", "algeria", "morocco",
+    "mauritania", "sudan", "ethiopia", "eritrea", "somalia", "djibouti",
+    "kenya", "tanzania", "uganda", "rwanda", "burundi", "south sudan",
+    "chad", "niger", "nigeria", "ghana", "ivory coast", "senegal", "mali",
+    "burkina faso", "benin", "togo", "sierra leone", "liberia", "guinea",
+    "gambia", "guinea-bissau", "cape verde", "sao tome", "equatorial guinea",
+    "gabon", "congo", "central african republic", "cameroon", "zambia",
+    "zimbabwe", "malawi", "mozambique", "angola", "namibia", "botswana",
+    "south africa", "lesotho", "eswatini", "comoros", "mauritius", "seychelles",
+    "madagascar", "australia", "new zealand", "papua new guinea", "fiji",
+    "solomon islands", "vanuatu", "new caledonia", "samoa", "tonga", "niue",
+    "cook islands", "tuvalu", "nauru", "palau", "marshall islands",
+    "micronesia", "kiribati",
+}
+
+
+def _is_valid_genre(genre: str, db: Session) -> bool:
+    """Check if a genre tag is valid (not an artist name, not garbage, not language/country)."""
+    if not genre or not genre.strip():
+        return False
+
+    genre_lower = genre.lower().strip()
+
+    # 1. Check against garbage tags
+    if genre_lower in _GARBAGE_TAGS:
+        return False
+
+    # 2. Check against language/country tags
+    if genre_lower in _LANGUAGE_COUNTRY_TAGS:
+        return False
+
+    # 3. Check if it matches an existing artist name (case-insensitive)
+    # This catches cases like "nightwish", "metallica", "juan gabriel"
+    artist_exists = db.query(models.Artist.id).filter(
+        models.Artist.name.ilike(genre_lower)
+    ).first()
+    if artist_exists:
+        return False
+
+    return True
+
+
+@router.get("/genre-suggestions", response_model=schemas.GenreSuggestionsResponse)
+def get_genre_suggestions(
+    min_songs: int = Query(5, ge=1),
+    db: Session = Depends(get_db),
+):
+    """Return filtered genre suggestions for smart playlist creation.
+    
+    Filters out:
+    - Artist names (case-insensitive match against Artist table)
+    - Known garbage tags from MusicBrainz/Last.fm
+    - Language/country tags ("japanese", "spanish", "colombia", etc.)
+    """
+    from collections import Counter
+
+    # Get all primary genres with their counts
+    rows = db.query(models.Song.primary_genre).filter(
+        models.Song.primary_genre.isnot(None)
+    ).all()
+    genres = [r[0] for r in rows]
+    counts = Counter(genres)
+
+    # Filter and build suggestions
+    suggestions = []
+    for genre, count in counts.most_common():
+        if count < min_songs:
+            continue
+        if _is_valid_genre(genre, db):
+            suggestions.append(schemas.GenreSuggestion(
+                genre=genre,
+                song_count=count,
+                checked=True,
+            ))
+
+    return schemas.GenreSuggestionsResponse(suggestions=suggestions)
+
+
+@router.post("/create-from-genres", response_model=schemas.CreateGenrePlaylistsResponse)
+def create_genre_playlists(
+    data: schemas.CreateGenrePlaylistsRequest,
+    db: Session = Depends(get_db),
+):
+    """Create SmartPlaylists from selected genres.
+    
+    Each playlist will have a single condition: primary_genre IS <genre>
+    """
+    created = []
+    skipped = []
+
+    for genre in data.genres:
+        if not genre or not genre.strip():
+            continue
+
+        name = genre.strip().title()
+
+        # Check if playlist with this name already exists
+        existing = db.query(models.SmartPlaylist).filter(
+            models.SmartPlaylist.name == name
+        ).first()
+        if existing:
+            skipped.append(name)
+            continue
+
+        # Create the smart playlist
+        conditions = [
+            {
+                "field": "primary_genre",
+                "op": "is",
+                "value": genre.strip(),
+            }
+        ]
+
+        pl = models.SmartPlaylist(
+            name=name,
+            match_all=True,
+            conditions=conditions,
+        )
+        db.add(pl)
+        created.append(name)
+
+    db.commit()
+
+    return schemas.CreateGenrePlaylistsResponse(
+        created=created,
+        skipped=skipped,
     )

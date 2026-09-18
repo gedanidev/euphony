@@ -7,6 +7,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import ErrorState from '../components/ErrorState'
 import SmartPlaylistBuilder from '../components/SmartPlaylistBuilder'
+import GenrePlaylistSuggestion from '../components/GenrePlaylistSuggestion'
 
 function CreateModal({ onClose, onCreate }) {
   const [form, setForm] = useState({ name: '', description: '' })
@@ -76,6 +77,7 @@ function SmartTab() {
   const [error, setError] = useState(null)
   const [showBuilder, setShowBuilder] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [showGenreSuggestions, setShowGenreSuggestions] = useState(false)
   const { t } = useTranslation()
 
   const load = async () => {
@@ -110,7 +112,16 @@ function SmartTab() {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-4 gap-2">
+        <button
+          onClick={() => setShowGenreSuggestions(true)}
+          className="px-4 py-2 bg-[#1e1e30] hover:bg-[#2e2e4a] text-[#94a3b8] hover:text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+          Suggested Playlists
+        </button>
         <button
           onClick={() => { setEditing(null); setShowBuilder(true) }}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -177,6 +188,22 @@ function SmartTab() {
           existing={editing}
           onClose={() => { setShowBuilder(false); setEditing(null) }}
           onSaved={() => { setShowBuilder(false); setEditing(null); load() }}
+        />
+      )}
+
+      {showGenreSuggestions && (
+        <GenrePlaylistSuggestion
+          onClose={() => setShowGenreSuggestions(false)}
+          onCreated={(result) => {
+            setShowGenreSuggestions(false)
+            if (result.created.length > 0) {
+              alert(`Created playlists: ${result.created.join(', ')}`)
+            }
+            if (result.skipped.length > 0) {
+              console.log('Skipped (already exist):', result.skipped)
+            }
+            load()
+          }}
         />
       )}
     </div>

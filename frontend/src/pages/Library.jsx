@@ -33,6 +33,15 @@ function AvailabilityBadge({ value }) {
   )
 }
 
+function GenreBadge({ value }) {
+  if (!value) return <span className="text-[#475569]">—</span>
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-300 capitalize">
+      {value}
+    </span>
+  )
+}
+
 // Artist search/select with inline create
 function ArtistSelector({ value, onChange, required }) {
   const [query, setQuery] = useState('')
@@ -557,15 +566,21 @@ export default function Library() {
       sortable: false,
       render: (song) => song.album?.title || '—'
     },
-    { 
-      key: 'year', 
-      label: t('library.col.year'), 
+    {
+      key: 'year',
+      label: t('library.col.year'),
       sortable: false,
       className: 'text-[#64748b]',
       render: (song) => song.year || '—'
     },
-    { 
-      key: 'availability', 
+    {
+      key: 'genre',
+      label: t('library.col.genre'),
+      sortable: false,
+      render: (song) => <GenreBadge value={song.primary_genre} />
+    },
+    {
+      key: 'availability',
       label: t('library.col.status'), 
       sortable: false,
       render: (song) => <AvailabilityBadge value={song.availability} />
@@ -641,6 +656,7 @@ export default function Library() {
             {/* Metadata row */}
             <div className="flex items-center gap-3 mt-2">
               <AvailabilityBadge value={song.availability} />
+              {song.primary_genre && <GenreBadge value={song.primary_genre} />}
               {song.year && (
                 <span className="text-xs text-[#64748b]">{song.year}</span>
               )}

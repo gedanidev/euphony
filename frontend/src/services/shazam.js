@@ -1,5 +1,5 @@
 /**
- * Shazam API client via RapidAPI - v2 API (Apple Music Catalog schema)
+ * Shazam API client via RapidAPI
  * Plan gratuito: 500 requests/mes
  */
 
@@ -33,30 +33,13 @@ async function shazamFetch(endpoint, params = {}) {
 }
 
 /**
- * Parse artwork URL - replace {w}x{h} with actual dimensions
- * @param {string} url - URL with {w}x{h} placeholder
- * @param {number} size - Desired size (default 400)
- * @returns {string} URL with actual dimensions
- */
-function parseArtworkUrl(url, size = 400) {
-  if (!url) return ''
-  return url.replace(/{w}x{h}/g, `${size}x${size}`)
-}
-
-/**
- * Formatear duración en ms a MM:SS
- * @param {number} ms - Duración en milisegundos
- * @returns {string} Formato MM:SS
- */
-function formatDuration(ms) {
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
-/**
- * Buscar canciones por query string (v2 API)
+ * Buscar canciones por query string
+ *
+ * NOTE: this RapidAPI key is subscribed to the Shazam v2 API, which mirrors
+ * the Apple Music Catalog schema (results.songs.data[].attributes) — not the
+ * older v1 scraper-style schema (tracks.hits[].track) this file originally
+ * assumed. Verified against a live response 2026-09-03.
+ *
  * @param {string} term - Término de búsqueda
  * @param {number} limit - Límite de resultados (max 50)
  * @param {number} offset - Offset para paginación
@@ -72,42 +55,123 @@ export async function searchSongs(term, { limit = 10, offset = 0 } = {}) {
     limit: Math.min(limit, 50),
   })
 
-  // v2 API: results.songs.data[].attributes (Apple Music Catalog schema)
-  const songs = data?.results?.songs?.data || []
-  return songs.map(song => {
-    const attrs = song.attributes || {}
+  const tracks = data?.results?.songs?.data || []
+  return tracks.map(item => {
+    const a = item.attributes || {}
+    const cover = a.artwork?.url ? a.artwork.url.replace('{w}x{h}', '400x400') : ''
+    const year = a.releaseDate ? parseInt(a.releaseDate.slice(0, 4)) || null : null
+    const duration = a.durationInMillis ? Math.floor(a.durationInMillis / 1000) : null
+    const genre = a.genreNames?.[0] || ''
+
     return {
-      id: song.id,
-      title: attrs.name || '',
-      artist: attrs.artistName || '',
-      artistId: attrs.artistId,
-      album: attrs.albumName || '',
-      year: attrs.releaseDate ? parseInt(attrs.releaseDate.slice(0, 4)) : null,
-      duration: attrs.durationInMillis ? Math.floor(attrs.durationInMillis / 1000) : null,
-      durationText: attrs.durationInMillis ? formatDuration(attrs.durationInMillis) : '',
-      cover: parseArtworkUrl(attrs.artwork?.url, 400),
-      shazamId: song.id,
-      shazamUrl: attrs.url || '',
-      genre: attrs.genreNames?.[0] || '',
+      id: item.id,
+      title: a.name || '',
+      artist: a.artistName || '',
+      album: a.albumName || '',
+      year,
+      duration,
+      durationText: null,
+      cover,
+      shazamId: item.id,
+      shazamUrl: a.url || '',
+      genre,
+      label: '',
       // Para crear la canción localmente
       normalized: {
-        title: attrs.name || '',
-        artist_name: attrs.artistName || '',
-        album: attrs.albumName || '',
-        year: attrs.releaseDate ? parseInt(attrs.releaseDate.slice(0, 4)) : null,
-        duration: attrs.durationInMillis ? Math.floor(attrs.durationInMillis / 1000) : null,
-        source_url: attrs.url || '',
+        title: a.name || '',
+        artist_name: a.artistName || '',
+        album: a.albumName || '',
+        year,
+        duration,
+        source_url: a.url || '',
         source: 'shazam',
-        external_id: song.id,
-        cover_url: parseArtworkUrl(attrs.artwork?.url, 400),
-        genre: attrs.genreNames?.[0] || '',
+        external_id: item.id,
+        cover_url: cover,
+        genre,
       }
     }
   })
 }
 
 /**
- * Autocompletar sugerencias mientras escribe (v2 API)
+ * Obtener detalles de una canción por Shazam ID
+ *
+ * NOT USED by ShazamSearch.jsx currently, and NOT verified against the v2
+ * API this key is subscribed to (unlike searchSongs/getSearchSuggestions,
+ * which were fixed and tested 2026-09-03) — still on the old v1 path/shape.
+ * Fix this the same way (test against /v2/... first) before wiring it up.
+ *
+ * @param {string} key - Shazam song key
+ * @returns {Promise<Object>} Detalles de la canción
+ */
+export async function getSongDetails(key) {
+  const data = await shazamFetch('/songs/get-details', { key })
+
+  const track = data?.track
+  if (!track) throw new Error('Song not found')
+
+  return {
+    id: track.key,
+    title: track.title || '',
+    artist: track.subtitle || '',
+    artistId: track.artists?.[0]?.adamid,
+    album: track.sections?.[0]?.metadata?.find(m => m.title === 'Album')?.text || '',
+    year: track.sections?.[0]?.metadata?.find(m => m.title === 'Released')?.text || '',
+    duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : null,
+    durationText: track.duration_label || '',
+    cover: track.share?.image || track.images?.coverart || '',
+    shazamId: track.key,
+    shazamUrl: track.url || '',
+    genre: track.genres?.primary || '',
+    label: track.hub?.actions?.[0]?.label || '',
+    lyrics: track.sections?.find(s => s.type === 'LYRICS')?.text || '',
+    previewUrl: track.hub?.actions?.[1]?.uri || '', // Preview audio
+    normalized: {
+      title: track.title || '',
+      artist_name: track.subtitle || '',
+      album: track.sections?.[0]?.metadata?.find(m => m.title === 'Album')?.text || '',
+      year: parseInt(track.sections?.[0]?.metadata?.find(m => m.title === 'Released')?.text) || null,
+      duration: track.duration_ms ? Math.floor(track.duration_ms / 1000) : null,
+      source_url: track.url || '',
+      source: 'shazam',
+      external_id: track.key,
+      cover_url: track.share?.image || track.images?.coverart || '',
+      genre: track.genres?.primary || '',
+      preview_url: track.hub?.actions?.[1]?.uri || '',
+    }
+  }
+}
+
+/**
+ * Buscar artistas
+ *
+ * NOT USED by ShazamSearch.jsx currently, and NOT verified against v2 (see
+ * getSongDetails note above) — still on the old v1 path/shape.
+ *
+ * @param {string} query - Nombre del artista
+ * @param {number} limit - Límite de resultados
+ * @returns {Promise<Array>} Artistas encontrados
+ */
+export async function searchArtists(query, { limit = 10 } = {}) {
+  if (!query?.trim()) return []
+
+  const data = await shazamFetch('/search', {
+    term: query,
+    locale: 'en-US',
+    limit: Math.min(limit, 50),
+  })
+
+  const artists = data?.artists?.hits || []
+  return artists.map(hit => ({
+    id: hit.artist?.adamid,
+    name: hit.artist?.name || hit.heading?.name || '',
+    avatar: hit.artist?.avatar || hit.heading?.avatar || '',
+    url: hit.artist?.url || '',
+  }))
+}
+
+/**
+ * Autocompletar sugerencias mientras escribe
  * @param {string} query - Query parcial
  * @returns {Promise<Array>} Sugerencias
  */
@@ -120,8 +184,7 @@ export async function getSearchSuggestions(query) {
       locale: 'en-US',
     })
 
-    // v2 API returns suggestions in results.suggestions
-    return data?.results?.suggestions || []
+    return data?.results?.terms || []
   } catch {
     return []
   }
@@ -144,17 +207,14 @@ export function extractSongData(shazamResult) {
     album: shazamResult.normalized.album,
     year: shazamResult.normalized.year,
     duration: shazamResult.normalized.duration,
-    type: 'original',
-    availability: 'wishlist',
+    type: 'original', // Asumimos original por defecto
+    availability: 'wishlist', // Default a wishlist
     source_url: shazamResult.normalized.source_url,
     source: 'shazam',
     external_id: shazamResult.normalized.external_id,
     cover_url: shazamResult.normalized.cover_url,
-    primary_genre: shazamResult.normalized.genre, // v2 uses primary_genre, not genre
-    mood: null,
+    genre: shazamResult.normalized.genre,
+    mood: null, // Sin mood por defecto
     comment: `Imported from Shazam: ${shazamResult.shazamUrl}`,
   }
 }
-
-// Note: getSongDetails and searchArtists are not used by the UI currently.
-// If needed, they should also be migrated to v2 endpoints.
