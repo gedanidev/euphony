@@ -451,6 +451,26 @@ class SmartPlaylistPreviewResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Genre Playlist Suggestions
+# ---------------------------------------------------------------------------
+
+class GenreSuggestion(BaseModel):
+    genre: str
+    song_count: int
+    checked: bool = True  # Frontend default state
+
+class GenreSuggestionsResponse(BaseModel):
+    suggestions: List[GenreSuggestion]
+
+class CreateGenrePlaylistsRequest(BaseModel):
+    genres: List[str]  # Lista de géneros a crear como smart playlists
+
+class CreateGenrePlaylistsResponse(BaseModel):
+    created: List[str]   # Nombres de playlists creadas
+    skipped: List[str]  # Nombres que ya existían (no se crearon)
+
+
+# ---------------------------------------------------------------------------
 # Walkman / Wishlist / Playlist import
 # ---------------------------------------------------------------------------
 
@@ -475,3 +495,27 @@ class PlaylistImportResult(BaseModel):
     total: int
     matched: int
     unresolved: int
+
+
+# ---------------------------------------------------------------------------
+# Spotify Playlist Import
+# ---------------------------------------------------------------------------
+
+class SpotifyImportTrack(BaseModel):
+    title: str
+    artist: str
+    spotify_id: Optional[str] = None
+    album: Optional[str] = None
+
+class SpotifyPlaylistImportRequest(BaseModel):
+    playlist_name: str
+    description: Optional[str] = None
+    tracks: List[SpotifyImportTrack]
+
+class SpotifyPlaylistImportResult(BaseModel):
+    playlist_id: UUID
+    playlist_name: str
+    total: int
+    matched: int
+    unresolved: int
+    unmatched_tracks: List[SpotifyImportTrack] = []

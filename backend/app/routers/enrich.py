@@ -19,8 +19,10 @@ from uuid import UUID
 
 from app.database import get_db, SessionLocal
 from app import models, schemas
+from app import genre_enricher
 
 _enrich_jobs: dict[str, dict] = {}
+_enrich_jobs_lock = threading.Lock()
 
 router = APIRouter(prefix="", tags=["enrich"])
 
@@ -554,3 +556,64 @@ def enrich_album(album_id: UUID, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(album)
     return album
+
+
+# ---------------------------------------------------------------------------
+# Genre enrichment batch job (Last.fm primary, MusicBrainz fallback)
+# ---------------------------------------------------------------------------
+
+def _genre_enrich_worker(job_id: str, limit: int | None) -> None:
+    db = SessionLocal()
+    try:
+        genre_enricher.run_genre_enrichment_batch(db, job_id, _enrich_jobs, limit=limit)
+    finally:
+        db.close()
+
+
+@router.post("/songs/enrich-genres", status_code=202)
+def songs_enrich_genres(limit: int | None = None, db: Session = Depends(get_db)):
+    """Start a background job to enrich all songs with Spotify genres.
+
+    Set `limit` to process only N songs (useful for testing).
+    """
+    with _enrich_jobs_lock:
+        active_job_id = next(
+            (jid for jid, job in _enrich_jobs.items() if job.get("status") in ("pending", "running")),
+            None,
+        )
+        if active_job_id:
+            raise HTTPException(
+                status_code=409,
+                detail=f"A genre-enrichment job is already running (job_id={active_job_id}). "
+                       "Cancel it or wait for it to finish before starting another.",
+            )
+
+        total = (
+            db.query(models.Song)
+            .filter(
+                (models.Song.spotify_id.is_(None)) | (models.Song.primary_genre.is_(None))
+            )
+            .count()
+        )
+        job_id = str(uuid_lib.uuid4())
+        _enrich_jobs[job_id] = {"status": "pending", "total": total, "processed": 0, "found": 0, "failed": 0}
+        threading.Thread(target=_genre_enrich_worker, args=(job_id, limit), daemon=True).start()
+
+    return {"job_id": job_id, "status": "pending", "total": total}
+
+
+@router.get("/songs/enrich-genres/status/{job_id}")
+def songs_enrich_genres_status(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.post("/songs/enrich-genres/cancel/{job_id}")
+def songs_enrich_genres_cancel(job_id: str):
+    job = _enrich_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job["cancelled"] = True
+    return {"cancelled": True}

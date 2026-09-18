@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -16,8 +16,12 @@ function NavItem({ to, icon, label, onClick }) {
         }`
       }
     >
-      <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">{icon}</span>
-      <span className="truncate">{label}</span>
+      {({ isActive }) => (
+        <>
+          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0" aria-hidden="true">{icon}</span>
+          <span className="truncate" aria-current={isActive ? 'page' : undefined}>{label}</span>
+        </>
+      )}
     </NavLink>
   )
 }
@@ -26,6 +30,7 @@ export default function Layout({ children }) {
   const { t } = useTranslation()
   const { logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   async function handleLogout() {
@@ -115,6 +120,8 @@ export default function Layout({ children }) {
           onClick={() => setSidebarOpen(true)}
           className="p-2.5 rounded-lg text-[#94a3b8] hover:bg-[#22223a] hover:text-[#e2e8f0] transition-colors touch-target"
           aria-label="Open menu"
+          aria-expanded={sidebarOpen}
+          aria-controls="sidebar-nav"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -142,15 +149,20 @@ export default function Layout({ children }) {
         <div
           className="fixed inset-0 z-40 bg-black/60 lg:hidden"
           onClick={closeSidebar}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#1a1a24] border-r border-[#2e2e4a] flex flex-col transform transition-transform duration-200
-        lg:relative lg:w-56 lg:flex-shrink-0 lg:translate-x-0
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      <aside
+        id="sidebar-nav"
+        className={`
+          fixed inset-y-0 left-0 z-50 w-64 bg-[#1a1a24] border-r border-[#2e2e4a] flex flex-col transform transition-transform duration-200
+          lg:relative lg:w-56 lg:flex-shrink-0 lg:translate-x-0
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+        aria-label="Main navigation"
+      >
         {/* Desktop logo + mobile close button */}
         <div className="p-5 border-b border-[#2e2e4a] flex items-center justify-between">
           <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">

@@ -18,6 +18,12 @@ export const deleteSmartPlaylist = (id) =>
 export const previewSmartPlaylist = (data) =>
   api.post('/smart-playlists/preview', data).then(r => r.data)
 
+export const getGenreSuggestions = () =>
+  api.get('/smart-playlists/genre-suggestions').then(r => r.data)
+
+export const createGenrePlaylists = (data) =>
+  api.post('/smart-playlists/create-from-genres', data).then(r => r.data)
+
 export const exportSmartPlaylistM3U = async (id, name) => {
   const res = await api.get(`/smart-playlists/${id}/export/m3u`, { responseType: 'blob' })
   const url = URL.createObjectURL(res.data)

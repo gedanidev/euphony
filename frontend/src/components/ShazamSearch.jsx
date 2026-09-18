@@ -4,7 +4,23 @@ import { searchSongs, extractSongData } from '../services/shazam'
 import { createSong } from '../api/songs'
 import { getArtists, createArtist } from '../api/artists'
 
-export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
+// The deployed backend requires artist_ids (UUIDs), but Shazam only gives us
+// an artist name string — look up an existing artist by that name, or create
+// one, and return its id.
+async function resolveArtistId(name) {
+  const trimmed = name?.trim()
+  if (!trimmed) return null
+
+  const { items } = await getArtists({ search: trimmed, limit: 5 })
+  const exact = items?.find(a => a.name.toLowerCase() === trimmed.toLowerCase())
+  if (exact) return exact.id
+  if (items?.length) return items[0].id
+
+  const created = await createArtist({ name: trimmed })
+  return created.id
+}
+
+export default function ShazamSearch({ onSongAdded, onClose }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -12,53 +28,7 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
   const [error, setError] = useState(null)
   const [adding, setAdding] = useState(new Set())
   const [added, setAdded] = useState(new Set())
-  const [confirmSong, setConfirmSong] = useState(null)
   const debounceRef = useRef(null)
-
-  // Build a quick lookup of existing songs by title+artist
-  const existingLookup = useRef(new Set())
-  useEffect(() => {
-    const set = new Set()
-    library.forEach(s => {
-      const key = `${(s.title || '').toLowerCase().trim()}|${(s.artist_name || '').toLowerCase().trim()}`
-      set.add(key)
-    })
-    existingLookup.current = set
-  }, [library])
-
-  const isInLibrary = useCallback((song) => {
-    const key = `${(song.title || '').toLowerCase().trim()}|${(song.artist || '').toLowerCase().trim()}`
-    return existingLookup.current.has(key)
-  }, [])
-
-  /**
-   * Resolve artist ID by name - search existing or create new
-   * @param {string} artistName - Name of the artist
-   * @returns {Promise<string>} Artist UUID
-   */
-  const resolveArtistId = useCallback(async (artistName) => {
-    if (!artistName?.trim()) {
-      throw new Error('Artist name is required')
-    }
-
-    // Search for existing artist
-    const response = await getArtists({ search: artistName.trim() })
-    const artists = response.items || []
-
-    // Look for exact or close match
-    const normalizedName = artistName.toLowerCase().trim()
-    const match = artists.find(a =>
-      a.name?.toLowerCase().trim() === normalizedName
-    )
-
-    if (match) {
-      return match.id
-    }
-
-    // Create new artist if not found
-    const newArtist = await createArtist({ name: artistName.trim() })
-    return newArtist.id
-  }, [])
 
   const search = useCallback(async (term) => {
     if (!term?.trim()) {
@@ -96,32 +66,30 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
     }
   }, [query, search])
 
-  const handleConfirmAdd = useCallback(async () => {
-    if (!confirmSong) return
-    const song = confirmSong
-    setConfirmSong(null)
-
+  const handleAddToWishlist = useCallback(async (song) => {
     const id = song.id
     if (adding.has(id) || added.has(id)) return
 
     setAdding(prev => new Set(prev).add(id))
 
     try {
-      // Resolve artist ID first (required by API)
-      const artistId = await resolveArtistId(song.artist)
-
       const songData = extractSongData(song)
-      const payload = {
-        ...songData,
-        availability: 'wishlist',
-        artist_ids: [artistId], // Required field
-      }
+      const artistId = await resolveArtistId(songData.artist_name)
+      if (!artistId) throw new Error('Could not resolve an artist for this song')
 
+      const payload = {
+        title: songData.title,
+        duration: songData.duration,
+        year: songData.year,
+        availability: 'wishlist',
+        primary_genre: songData.genre || null,
+        artist_ids: [artistId],
+      }
       const created = await createSong(payload)
       setAdded(prev => new Set(prev).add(id))
       onSongAdded?.(created)
     } catch (e) {
-      alert(`${t('shazam.addError')}: ${e.message}`)
+      alert(`Error adding to wishlist: ${e.message}`)
     } finally {
       setAdding(prev => {
         const next = new Set(prev)
@@ -129,7 +97,7 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
         return next
       })
     }
-  }, [confirmSong, adding, added, onSongAdded, t, resolveArtistId])
+  }, [adding, added, onSongAdded])
 
   const formatDuration = (seconds) => {
     if (!seconds) return '--:--'
@@ -140,7 +108,7 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl w-full max-w-4xl max-h-[80vh] flex flex-col modal-content">
         {/* Header */}
         <div className="p-4 border-b border-[#2e2e4a] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -148,14 +116,14 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
             </svg>
             <div>
-              <h2 className="text-lg font-semibold text-[#e2e8f0]">{t('shazam.searchTitle')}</h2>
-              <p className="text-xs text-[#94a3b8]">{t('shazam.searchPlaceholder')}</p>
+              <h2 className="text-lg font-semibold text-[#e2e8f0]">Buscar en Shazam</h2>
+              <p className="text-xs text-[#94a3b8]">Encuentra canciones y agrégalas a tu wishlist</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 text-[#94a3b8] hover:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-            aria-label={t('actions.close')}
+            aria-label={t('common.close')}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -169,7 +137,7 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
             <input
               autoFocus
               type="text"
-              placeholder={t('shazam.searchPlaceholder')}
+              placeholder="Buscar canciones, artistas, álbumes..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               className="w-full bg-[#0f0f13] border border-[#2e2e4a] rounded-lg pl-10 pr-4 py-3 text-base text-[#e2e8f0] placeholder-[#64748b] focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
@@ -190,7 +158,7 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
               <p className="text-red-400 mb-2">{error}</p>
               {error.includes('API key not configured') && (
                 <p className="text-sm text-[#94a3b8]">
-                  {t('shazam.apiNotConfigured')}
+                  Configura VITE_SHAZAM_API_KEY en tu archivo .env
                 </p>
               )}
             </div>
@@ -199,18 +167,17 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
               <svg className="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
-              <p>{t('shazam.searchPlaceholder')}</p>
+              <p>Escribe al menos 2 caracteres para buscar</p>
             </div>
           ) : results.length === 0 && !loading ? (
             <div className="p-8 text-center text-[#94a3b8]">
-              <p>{t('shazam.noResults')}</p>
+              <p>No se encontraron canciones</p>
             </div>
           ) : (
             <div className="divide-y divide-[#2e2e4a]">
               {results.map(song => {
-                const isAddingSong = adding.has(song.id)
-                const isAddedSong = added.has(song.id)
-                const inLibrary = isInLibrary(song)
+                const isAdding = adding.has(song.id)
+                const isAdded = added.has(song.id)
 
                 return (
                   <div key={song.id} className="p-4 flex items-center gap-4 hover:bg-[#22223a]/50 transition-colors">
@@ -253,37 +220,30 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
 
                     {/* Actions */}
                     <div className="flex-shrink-0">
-                      {isAddedSong ? (
+                      {isAdded ? (
                         <span className="flex items-center gap-1 px-3 py-2 text-sm text-green-400">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          {t('shazam.addedSuccess')}
-                        </span>
-                      ) : inLibrary ? (
-                        <span className="flex items-center gap-1 px-3 py-2 text-sm text-[#64748b]">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {t('shazam.alreadyInLibrary')}
+                          Agregado
                         </span>
                       ) : (
                         <button
-                          onClick={() => setConfirmSong(song)}
-                          disabled={isAddingSong}
+                          onClick={() => handleAddToWishlist(song)}
+                          disabled={isAdding}
                           className="flex items-center gap-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
                         >
-                          {isAddingSong ? (
+                          {isAdding ? (
                             <>
                               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              {t('common.saving')}
+                              Agregando...
                             </>
                           ) : (
                             <>
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                               </svg>
-                              {t('shazam.addToWishlist')}
+                              A wishlist
                             </>
                           )}
                         </button>
@@ -298,37 +258,9 @@ export default function ShazamSearch({ onSongAdded, onClose, library = [] }) {
 
         {/* Footer */}
         <div className="p-4 border-t border-[#2e2e4a] text-center text-xs text-[#64748b]">
-          Shazam via RapidAPI
+          Datos proporcionados por Shazam vía RapidAPI
         </div>
       </div>
-
-      {/* Confirmation Dialog */}
-      {confirmSong && (
-        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-[#e2e8f0] mb-2">
-              {t('shazam.addConfirmTitle')}
-            </h3>
-            <p className="text-[#94a3b8] mb-6">
-              {t('shazam.addConfirmDesc', { title: confirmSong.title, artist: confirmSong.artist })}
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmSong(null)}
-                className="px-4 py-2 text-sm text-[#94a3b8] hover:text-white transition-colors"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                onClick={handleConfirmAdd}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                {t('shazam.addToWishlist')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
