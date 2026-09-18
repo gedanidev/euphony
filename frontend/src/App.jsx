@@ -16,6 +16,7 @@ import Import from './pages/Import'
 import Settings from './pages/Settings'
 import SpotifyHistory from './pages/SpotifyHistory'
 import Wishlist from './pages/Wishlist'
+import GenreEditor from './pages/GenreEditor'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/spotify-history" element={<SpotifyHistory />} />
                 <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/genre-editor" element={<GenreEditor />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

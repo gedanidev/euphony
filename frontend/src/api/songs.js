@@ -32,3 +32,6 @@ export const toggleSongFavorite = (id) => api.patch(`/songs/${id}/favorite`).the
 
 export const getGenresUsed    = () => api.get('/songs/genres-used').then(r => r.data)
 export const getSubgenresUsed = () => api.get('/songs/subgenres-used').then(r => r.data)
+
+// Genre bulk edit
+export const batchGenre = (song_ids, primary_genre) => api.patch('/songs/batch/genre', { song_ids, primary_genre })
