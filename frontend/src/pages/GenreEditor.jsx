@@ -18,18 +18,33 @@ export default function GenreEditor() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
 
+  // /artists and /albums cap `limit` at 200 — page through until we have
+  // everything instead of asking for 10000 in one shot (was a 422).
+  const fetchAllPages = useCallback(async (fetchFn) => {
+    const pageSize = 200
+    let page = 1
+    let items = []
+    while (true) {
+      const res = await fetchFn({ page, limit: pageSize })
+      items = items.concat(res.items || [])
+      if (items.length >= res.total || !res.items?.length) break
+      page += 1
+    }
+    return items
+  }, [])
+
   // Load artists/albums on mount
   useEffect(() => {
     async function load() {
-      const [aRes, alRes] = await Promise.all([
-        getArtists({ limit: 10000 }),
-        getAlbums({ limit: 10000 }),
+      const [artistItems, albumItems] = await Promise.all([
+        fetchAllPages(getArtists),
+        fetchAllPages(getAlbums),
       ])
-      setArtists(aRes.items || [])
-      setAlbums(alRes.items || [])
+      setArtists(artistItems)
+      setAlbums(albumItems)
     }
     load()
-  }, [])
+  }, [fetchAllPages])
 
   // Load songs when selection changes
   const loadSongs = useCallback(async () => {
