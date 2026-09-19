@@ -267,6 +267,7 @@ def list_songs(
     search: Optional[str] = Query(None),
     availability: Optional[str] = Query(None),
     artist_id: Optional[UUID] = Query(None),
+    album_id: Optional[UUID] = Query(None),
     mood_id: Optional[UUID] = Query(None),
     walkman_status: Optional[str] = Query(None),
     sort_by: Optional[str] = Query("title", regex="^(title|artist|album)$"),
@@ -297,6 +298,9 @@ def list_songs(
         q = q.join(models.SongArtist, models.SongArtist.song_id == models.Song.id).filter(
             models.SongArtist.artist_id == artist_id
         )
+
+    if album_id:
+        q = q.filter(models.Song.album_id == album_id)
 
     if mood_id:
         q = q.join(models.SongMood, models.SongMood.song_id == models.Song.id).filter(
@@ -478,6 +482,10 @@ class BatchAvailabilityBody(BaseModel):
     song_ids: List[UUID]
     availability: str
 
+class BatchGenreBody(BaseModel):
+    song_ids: List[UUID]
+    primary_genre: str  # Empty string to clear
+
 class BatchDeleteAllBody(BaseModel):
     confirm: str  # must equal "DELETE_ALL"
 
@@ -496,6 +504,16 @@ def batch_availability(body: BatchAvailabilityBody, db: Session = Depends(get_db
         raise HTTPException(400, "Invalid availability value")
     db.query(models.Song).filter(models.Song.id.in_(body.song_ids)).update(
         {"availability": body.availability}, synchronize_session=False
+    )
+    db.commit()
+
+
+@router.patch("/batch/genre", status_code=204)
+def batch_genre(body: BatchGenreBody, db: Session = Depends(get_db)):
+    """Change primary_genre for a list of songs. Empty string clears it."""
+    value = body.primary_genre.strip() or None
+    db.query(models.Song).filter(models.Song.id.in_(body.song_ids)).update(
+        {"primary_genre": value}, synchronize_session=False
     )
     db.commit()
 

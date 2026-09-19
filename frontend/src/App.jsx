@@ -11,12 +11,12 @@ import Artists from './pages/Artists'
 import ArtistDetail from './pages/ArtistDetail'
 import Albums from './pages/Albums'
 import AlbumDetail from './pages/AlbumDetail'
-import Genres from './pages/Genres'
 import Moods from './pages/Moods'
 import Import from './pages/Import'
 import Settings from './pages/Settings'
 import SpotifyHistory from './pages/SpotifyHistory'
 import Wishlist from './pages/Wishlist'
+import GenreEditor from './pages/GenreEditor'
 
 export default function App() {
   return (
@@ -41,12 +41,12 @@ export default function App() {
                 <Route path="/artists/:id" element={<ArtistDetail />} />
                 <Route path="/albums" element={<Albums />} />
                 <Route path="/albums/:id" element={<AlbumDetail />} />
-                <Route path="/genres" element={<Genres />} />
                 <Route path="/moods" element={<Moods />} />
                 <Route path="/import" element={<Import />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/spotify-history" element={<SpotifyHistory />} />
                 <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/genre-editor" element={<GenreEditor />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
