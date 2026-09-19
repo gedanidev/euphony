@@ -508,9 +508,12 @@ class SpotifyImportTrack(BaseModel):
     album: Optional[str] = None
 
 class SpotifyPlaylistImportRequest(BaseModel):
-    playlist_name: str
+    # Either playlist_url (server fetches tracks using the user's connected
+    # Spotify account) or tracks (manual paste-list mode) must be provided.
+    playlist_url: Optional[str] = None
+    playlist_name: Optional[str] = None
     description: Optional[str] = None
-    tracks: List[SpotifyImportTrack]
+    tracks: Optional[List[SpotifyImportTrack]] = None
 
 class SpotifyPlaylistImportResult(BaseModel):
     playlist_id: UUID

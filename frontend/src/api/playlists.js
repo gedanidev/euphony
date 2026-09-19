@@ -8,7 +8,13 @@ export const deletePlaylist       = (id)               => api.delete(`/playlists
 export const addSongsToPlaylist   = (id, song_ids)     => api.post(`/playlists/${id}/songs`, { song_ids }).then(r => r.data)
 export const removeSongFromPlaylist = (id, song_id)    => api.delete(`/playlists/${id}/songs/${song_id}`).then(r => r.data)
 export const reorderPlaylist      = (id, order)        => api.patch(`/playlists/${id}/reorder`, { order }).then(r => r.data)
-export const exportPlaylist       = (id, format)       => api.get(`/playlists/${id}/export`, { params: { format }, responseType: 'blob' }).then(r => r.data)
+
+export const exportPlaylist = (id, format, relative, basePath) => {
+  const params = { format }
+  if (relative) params.relative = true
+  if (basePath) params.base_path = basePath
+  return api.get(`/playlists/${id}/export`, { params, responseType: 'blob' }).then(r => r.data)
+}
 
 export const importPlaylist = (file) => {
   const form = new FormData()
@@ -16,4 +22,8 @@ export const importPlaylist = (file) => {
   return api.post('/playlists/import', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then(r => r.data)
+}
+
+export const importSpotifyPlaylist = (data) => {
+  return api.post('/playlists/import-spotify', data).then(r => r.data)
 }

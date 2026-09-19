@@ -175,6 +175,150 @@ async def import_playlist(
     )
 
 
+def _extract_spotify_playlist_id(url_or_id: str) -> str:
+    """Accepts a full Spotify playlist URL, a spotify: URI, or a bare ID."""
+    match = re.search(r"playlist[/:]([a-zA-Z0-9]{22})", url_or_id)
+    if match:
+        return match.group(1)
+    if re.fullmatch(r"[a-zA-Z0-9]{22}", url_or_id.strip()):
+        return url_or_id.strip()
+    raise HTTPException(400, "Invalid Spotify playlist URL")
+
+
+def _fetch_spotify_playlist(playlist_url: str, db: Session) -> tuple[str, list[schemas.SpotifyImportTrack]]:
+    """Fetch a playlist's name and tracks from Spotify using the app's own
+    connected account (OAuth already set up in Settings) — no user-supplied
+    token needed, and no client-side call to Spotify's API."""
+    import spotipy
+    from app.routers.auth import _get_connection, _get_oauth, _refresh_if_needed
+
+    conn = _get_connection(db)
+    if not conn:
+        raise HTTPException(400, "Spotify not connected. Connect it in Settings first.")
+
+    oauth = _get_oauth()
+    access_token = _refresh_if_needed(conn, oauth, db)
+    sp = spotipy.Spotify(auth=access_token)
+
+    playlist_id = _extract_spotify_playlist_id(playlist_url)
+
+    try:
+        meta = sp.playlist(playlist_id, fields="name")
+        playlist_name = meta.get("name") or "Imported from Spotify"
+    except Exception as e:
+        raise HTTPException(400, f"Could not read Spotify playlist: {e}")
+
+    tracks: list[schemas.SpotifyImportTrack] = []
+    results = sp.playlist_items(
+        playlist_id,
+        fields="items(track(name,artists(name),album(name),id)),next",
+        additional_types=["track"],
+    )
+    while results:
+        for item in results.get("items", []):
+            track = item.get("track")
+            if not track:
+                continue
+            tracks.append(schemas.SpotifyImportTrack(
+                title=track.get("name") or "",
+                artist=", ".join(a.get("name", "") for a in track.get("artists", [])),
+                album=(track.get("album") or {}).get("name"),
+                spotify_id=track.get("id"),
+            ))
+        results = sp.next(results) if results.get("next") else None
+
+    return playlist_name, tracks
+
+
+@router.post("/import-spotify", response_model=schemas.SpotifyPlaylistImportResult, status_code=201)
+def import_spotify_playlist(
+    data: schemas.SpotifyPlaylistImportRequest,
+    db: Session = Depends(get_db),
+):
+    """Import a playlist from Spotify by matching tracks against the local library.
+
+    Two modes:
+      - playlist_url set: fetch the playlist server-side via the app's own
+        connected Spotify account (see Settings).
+      - tracks set directly: manual paste-list mode, no Spotify account needed.
+    """
+    if data.playlist_url:
+        playlist_name, tracks = _fetch_spotify_playlist(data.playlist_url, db)
+    elif data.tracks is not None:
+        playlist_name, tracks = (data.playlist_name or "Imported Playlist"), data.tracks
+    else:
+        raise HTTPException(400, "Either playlist_url or tracks must be provided")
+
+    pl = models.Playlist(name=playlist_name, description=data.description or "")
+    db.add(pl)
+    db.flush()
+
+    matched = 0
+    unresolved = 0
+    unmatched_tracks = []
+
+    for i, track in enumerate(tracks):
+        song = None
+
+        # 1. Exact match by spotify_id
+        if track.spotify_id:
+            song = db.query(models.Song).filter(
+                models.Song.spotify_id == track.spotify_id
+            ).first()
+
+        # 2. Exact match by title + artist (case-insensitive)
+        if not song and track.title and track.artist:
+            song = (
+                db.query(models.Song)
+                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                .filter(
+                    models.Song.title.ilike(track.title),
+                    models.Artist.name.ilike(track.artist),
+                )
+                .first()
+            )
+
+        # 3. Fuzzy match: title contains search text AND artist contains search text
+        if not song and track.title and track.artist:
+            song = (
+                db.query(models.Song)
+                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
+                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
+                .filter(
+                    models.Song.title.ilike(f"%{track.title}%"),
+                    models.Artist.name.ilike(f"%{track.artist}%"),
+                )
+                .first()
+            )
+
+        ps = models.PlaylistSong(
+            playlist_id=pl.id,
+            song_id=song.id if song else None,
+            position=i,
+            raw_title=track.title or None,
+            raw_artist=track.artist or None,
+        )
+        db.add(ps)
+
+        if song:
+            matched += 1
+        else:
+            unresolved += 1
+            unmatched_tracks.append(track)
+
+    db.commit()
+
+    return schemas.SpotifyPlaylistImportResult(
+        playlist_id=pl.id,
+        playlist_name=playlist_name,
+        total=len(tracks),
+        matched=matched,
+        unresolved=unresolved,
+        unmatched_tracks=unmatched_tracks,
+    )
+
+
 @router.get("/{playlist_id}", response_model=schemas.PlaylistDetailRead)
 def get_playlist(playlist_id: UUID, db: Session = Depends(get_db)):
     pl = _load_detail(playlist_id, db)
@@ -270,6 +414,8 @@ def reorder_songs(playlist_id: UUID, data: schemas.ReorderRequest, db: Session =
 def export_playlist(
     playlist_id: UUID,
     format: str = Query("json", pattern="^(json|csv|m3u)$"),
+    relative: bool = Query(False, description="Generate relative paths for M3U export"),
+    base_path: Optional[str] = Query(None, description="Base path to strip for relative M3U paths"),
     db: Session = Depends(get_db),
 ):
     pl = _load_detail(playlist_id, db)
@@ -308,6 +454,19 @@ def export_playlist(
             if not path:
                 skipped += 1
                 continue
+
+            # Convert to relative path if requested
+            if relative and base_path:
+                import os
+                # Normalize paths for comparison
+                norm_path = os.path.normpath(path)
+                norm_base = os.path.normpath(base_path)
+                # Try to make relative
+                if norm_path.startswith(norm_base + os.sep):
+                    path = norm_path[len(norm_base) + 1:].replace(os.sep, "/")
+                elif norm_path.startswith(norm_base):
+                    path = norm_path[len(norm_base):].lstrip(os.sep).replace(os.sep, "/")
+
             duration = s.duration if s.duration else -1
             artist = s.artist_display or ""
             title = s.title or ""
