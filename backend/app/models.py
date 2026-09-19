@@ -72,6 +72,18 @@ class Mood(Base):
     song_moods = relationship("SongMood", back_populates="mood", cascade="all, delete-orphan")
 
 
+class Genre(Base):
+    """A registry of genre names that exist, independent of whether any
+    song has been tagged with them yet. Song.primary_genre stays a plain
+    string (matched by name) — this table only exists so a genre can be
+    created as an empty placeholder before any song is assigned to it."""
+    __tablename__ = "genres"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), default=_now)
+
+
 # ---------------------------------------------------------------------------
 # Song (relational redesign)
 # ---------------------------------------------------------------------------

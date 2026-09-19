@@ -471,6 +471,30 @@ class CreateGenrePlaylistsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Genre browsing (list -> artists, same pattern as Artists page)
+# ---------------------------------------------------------------------------
+
+class GenreSummary(BaseModel):
+    genre: str
+    song_count: int
+    artist_count: int
+
+class GenreCreate(BaseModel):
+    name: str
+
+class GenreArtist(BaseModel):
+    id: UUID
+    name: str
+    image_url: Optional[str] = None
+    song_count: int  # songs by this artist within this specific genre
+
+class GenreReassignRequest(BaseModel):
+    from_genre: str
+    to_genre: str
+    artist_id: Optional[UUID] = None  # None = rename the whole genre
+
+
+# ---------------------------------------------------------------------------
 # Walkman / Wishlist / Playlist import
 # ---------------------------------------------------------------------------
 
