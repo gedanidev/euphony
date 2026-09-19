@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
 import { importSpotifyPlaylist } from '../api/playlists'
 
+// Spotify blocks reading playlist track contents via its API for personal/
+// development-mode apps (same restriction category that killed artist
+// genres earlier) — confirmed with a 403 regardless of playlist ownership,
+// visibility, or query params. Until/unless Extended Quota Mode is granted
+// for this app, "paste a track list" is the only import path that works.
 export default function SpotifyImportModal({ onClose, onImported }) {
-  const { t } = useTranslation()
-  const [mode, setMode] = useState('url') // 'url' | 'manual'
-  const [url, setUrl] = useState('')
   const [manualText, setManualText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -44,21 +45,14 @@ export default function SpotifyImportModal({ onClose, onImported }) {
     setResult(null)
 
     try {
-      let importResult
-      if (mode === 'url') {
-        // Backend fetches the playlist itself using the Spotify account
-        // already connected in Settings — no token handling here.
-        importResult = await importSpotifyPlaylist({ playlist_url: url })
-      } else {
-        const tracks = parseManualText(manualText)
-        if (!tracks.length) {
-          throw new Error('No tracks found')
-        }
-        importResult = await importSpotifyPlaylist({
-          playlist_name: 'Imported Playlist',
-          tracks,
-        })
+      const tracks = parseManualText(manualText)
+      if (!tracks.length) {
+        throw new Error('No tracks found')
       }
+      const importResult = await importSpotifyPlaylist({
+        playlist_name: 'Imported Playlist',
+        tracks,
+      })
 
       setResult(importResult)
       if (onImported) onImported(importResult)
@@ -78,7 +72,7 @@ export default function SpotifyImportModal({ onClose, onImported }) {
       >
         {/* Header */}
         <div className="p-5 border-b border-[#2e2e4a] flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Import from Spotify</h2>
+          <h2 className="text-lg font-semibold">Import Playlist</h2>
           <button onClick={onClose} className="text-[#94a3b8] hover:text-white">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -86,67 +80,26 @@ export default function SpotifyImportModal({ onClose, onImported }) {
           </button>
         </div>
 
-        {/* Mode tabs */}
-        {!result && (
-          <div className="flex gap-2 px-5 pt-4">
-            <button
-              onClick={() => setMode('url')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                mode === 'url' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'
-              }`}
-            >
-              From URL
-            </button>
-            <button
-              onClick={() => setMode('manual')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                mode === 'manual' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'
-              }`}
-            >
-              Paste List
-            </button>
-          </div>
-        )}
-
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
           {!result ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'url' ? (
-                <>
-                  <div>
-                    <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
-                      Spotify Playlist URL
-                    </label>
-                    <input
-                      type="text"
-                      value={url}
-                      onChange={e => setUrl(e.target.value)}
-                      placeholder="https://open.spotify.com/playlist/..."
-                      className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
-                    />
-                    <p className="text-xs text-[#94a3b8] mt-1">
-                      Uses the Spotify account already connected in Settings — private playlists work too.
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
-                    Track List
-                  </label>
-                  <textarea
-                    value={manualText}
-                    onChange={e => setManualText(e.target.value)}
-                    placeholder={`Artist - Song Title\nAnother Artist - Another Song\n...`}
-                    rows={12}
-                    className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500 resize-none"
-                  />
-                  <p className="text-xs text-[#94a3b8] mt-1">
-                    One track per line in "Artist - Title" format
-                  </p>
-                </div>
-              )}
+              <div>
+                <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
+                  Track List
+                </label>
+                <textarea
+                  autoFocus
+                  value={manualText}
+                  onChange={e => setManualText(e.target.value)}
+                  placeholder={`Artist - Song Title\nAnother Artist - Another Song\n...`}
+                  rows={12}
+                  className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500 resize-none"
+                />
+                <p className="text-xs text-[#94a3b8] mt-1">
+                  One track per line in "Artist - Title" format. Spotify doesn't let personal apps read a playlist's tracks directly, so paste them here instead.
+                </p>
+              </div>
 
               {error && (
                 <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
@@ -206,10 +159,10 @@ export default function SpotifyImportModal({ onClose, onImported }) {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={loading || (mode === 'url' ? !url.trim() : !manualText.trim())}
+                disabled={loading || !manualText.trim()}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                {loading ? 'Importing…' : `Import ${mode === 'url' ? 'from Spotify' : 'Tracks'}`}
+                {loading ? 'Importing…' : 'Import Tracks'}
               </button>
             </>
           )}
