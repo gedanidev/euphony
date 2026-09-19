@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { listArtists } from '../api/artists'
-import { listAlbums } from '../api/albums'
+import { getArtists } from '../api/artists'
+import { getAlbums } from '../api/albums'
 import { getSongs, batchGenre } from '../api/songs'
 import LoadingSpinner from '../components/LoadingSpinner'
 
@@ -22,8 +22,8 @@ export default function GenreEditor() {
   useEffect(() => {
     async function load() {
       const [aRes, alRes] = await Promise.all([
-        listArtists({ limit: 10000 }),
-        listAlbums({ limit: 10000 }),
+        getArtists({ limit: 10000 }),
+        getAlbums({ limit: 10000 }),
       ])
       setArtists(aRes.items || [])
       setAlbums(alRes.items || [])
@@ -104,10 +104,10 @@ export default function GenreEditor() {
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-6">{t('genreEditor.title')}</h1>
+      <h1 className="text-2xl font-bold mb-6 text-white">{t('genreEditor.title')}</h1>
 
       {message && (
-        <div className={`mb-4 p-3 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div className={`mb-4 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
           {message.text}
         </div>
       )}
@@ -116,13 +116,13 @@ export default function GenreEditor() {
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => { setMode('artist'); setSelectedId(null); setSongs([]); }}
-          className={`px-4 py-2 rounded ${mode === 'artist' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'artist' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'}`}
         >
           {t('genreEditor.byArtist')}
         </button>
         <button
           onClick={() => { setMode('album'); setSelectedId(null); setSongs([]); }}
-          className={`px-4 py-2 rounded ${mode === 'album' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mode === 'album' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'}`}
         >
           {t('genreEditor.byAlbum')}
         </button>
@@ -133,7 +133,7 @@ export default function GenreEditor() {
         <select
           value={selectedId || ''}
           onChange={(e) => setSelectedId(e.target.value || null)}
-          className="w-full max-w-md p-2 border rounded"
+          className="w-full max-w-md px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] focus:outline-none focus:border-purple-500"
         >
           <option value="">{mode === 'artist' ? t('genreEditor.selectArtist') : t('genreEditor.selectAlbum')}</option>
           {filteredItems.map(item => (
@@ -150,38 +150,40 @@ export default function GenreEditor() {
       {songs.length > 0 && !loading && (
         <>
           <div className="mb-4 flex items-center justify-between">
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-[#e2e8f0]">
               <input
                 type="checkbox"
                 checked={selectedSongs.size === songs.length && songs.length > 0}
                 onChange={toggleAll}
+                className="accent-purple-500 w-4 h-4 cursor-pointer"
               />
-              <span>{t('genreEditor.selectAll', { count: songs.length })}</span>
+              <span className="text-sm">{t('genreEditor.selectAll', { count: songs.length })}</span>
             </label>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-[#94a3b8]">
               {t('genreEditor.selected', { count: selectedSongs.size })}
             </span>
           </div>
 
-          <div className="overflow-x-auto border rounded mb-6">
-            <table className="w-full text-left">
-              <thead className="bg-gray-100">
+          <div className="overflow-x-auto border border-[#2e2e4a] rounded-xl mb-6">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[#1e1e30] text-[#94a3b8]">
                 <tr>
                   <th className="p-2 w-10"></th>
-                  <th className="p-2">{t('song.title')}</th>
-                  <th className="p-2">{t('song.artist')}</th>
-                  <th className="p-2">{t('song.album')}</th>
-                  <th className="p-2">{t('song.genre')}</th>
+                  <th className="p-2 font-medium">{t('library.col.title')}</th>
+                  <th className="p-2 font-medium">{t('library.col.artist')}</th>
+                  <th className="p-2 font-medium">{t('library.col.album')}</th>
+                  <th className="p-2 font-medium">{t('library.col.genre')}</th>
                 </tr>
               </thead>
               <tbody>
                 {songs.map(song => (
-                  <tr key={song.id} className="border-t hover:bg-gray-50">
+                  <tr key={song.id} className="border-t border-[#2e2e4a] hover:bg-[#1e1e30] text-[#e2e8f0]">
                     <td className="p-2">
                       <input
                         type="checkbox"
                         checked={selectedSongs.has(song.id)}
                         onChange={() => toggleSong(song.id)}
+                        className="accent-purple-500 w-4 h-4 cursor-pointer"
                       />
                     </td>
                     <td className="p-2">{song.title}</td>
@@ -190,7 +192,7 @@ export default function GenreEditor() {
                     </td>
                     <td className="p-2">{song.album?.title || '-'}</td>
                     <td className="p-2">
-                      <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 text-sm">
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-300 capitalize">
                         {song.primary_genre || '-'}
                       </span>
                     </td>
@@ -202,28 +204,28 @@ export default function GenreEditor() {
 
           {/* Genre editor */}
           {selectedSongs.size > 0 && (
-            <div className="bg-gray-50 p-4 rounded border">
-              <h3 className="font-semibold mb-3">{t('genreEditor.editSelected')}</h3>
+            <div className="bg-[#13131a] border border-[#2e2e4a] rounded-xl p-4">
+              <h3 className="font-semibold mb-3 text-[#e2e8f0]">{t('genreEditor.editSelected')}</h3>
               <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="text"
                   value={newGenre}
                   onChange={(e) => setNewGenre(e.target.value)}
                   placeholder={t('genreEditor.newGenrePlaceholder')}
-                  className="px-3 py-2 border rounded"
+                  className="px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
                   disabled={saving}
                 />
                 <button
                   onClick={applyGenre}
                   disabled={!newGenre.trim() || saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   {saving ? t('common.saving') : t('genreEditor.apply')}
                 </button>
                 <button
                   onClick={clearGenre}
                   disabled={saving}
-                  className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
+                  className="px-4 py-2 bg-[#1e1e30] hover:bg-[#2e2e4a] disabled:opacity-50 text-[#94a3b8] hover:text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   {t('genreEditor.clear')}
                 </button>
@@ -234,7 +236,7 @@ export default function GenreEditor() {
       )}
 
       {selectedId && songs.length === 0 && !loading && (
-        <p className="text-gray-500">{t('genreEditor.noSongs')}</p>
+        <p className="text-[#94a3b8]">{t('genreEditor.noSongs')}</p>
       )}
     </div>
   )

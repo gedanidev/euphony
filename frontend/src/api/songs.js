@@ -12,6 +12,7 @@ export const getSongCovers = (id)   => api.get(`/songs/${id}/covers`).then(r => 
 export const batchDelete       = (song_ids)              => api.post('/songs/batch/delete', { song_ids })
 export const batchAvailability = (song_ids, availability) => api.post('/songs/batch/availability', { song_ids, availability })
 export const batchDeleteAll    = ()                       => api.post('/songs/batch/delete-all', { confirm: 'DELETE_ALL' })
+export const batchGenre        = (song_ids, primary_genre) => api.patch('/songs/batch/genre', { song_ids, primary_genre })
 
 // Lyrics
 export const getLyrics      = (id)         => api.get(`/songs/${id}/lyrics`).then(r => r.data)
@@ -32,6 +33,3 @@ export const toggleSongFavorite = (id) => api.patch(`/songs/${id}/favorite`).the
 
 export const getGenresUsed    = () => api.get('/songs/genres-used').then(r => r.data)
 export const getSubgenresUsed = () => api.get('/songs/subgenres-used').then(r => r.data)
-
-// Genre bulk edit
-export const batchGenre = (song_ids, primary_genre) => api.patch('/songs/batch/genre', { song_ids, primary_genre })
