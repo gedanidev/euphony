@@ -25,7 +25,7 @@ from app import models, schemas
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-SPOTIFY_SCOPE = "user-read-recently-played"
+SPOTIFY_SCOPE = "user-read-recently-played playlist-read-private playlist-read-collaborative"
 
 
 def _get_oauth() -> SpotifyOAuth:
