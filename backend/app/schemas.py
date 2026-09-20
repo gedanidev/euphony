@@ -268,7 +268,7 @@ class BatchAddSongs(BaseModel):
     song_ids: List[UUID]
 
 class ReorderItem(BaseModel):
-    song_id: UUID
+    item_id: UUID  # PlaylistSong.id, not Song.id — works for unresolved entries too
     position: int
 
 class ReorderRequest(BaseModel):

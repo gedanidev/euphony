@@ -440,18 +440,22 @@ def add_songs(playlist_id: UUID, data: schemas.BatchAddSongs, db: Session = Depe
     return _to_detail(pl)
 
 
-@router.delete("/{playlist_id}/songs/{song_id}", response_model=schemas.PlaylistDetailRead)
-def remove_song(playlist_id: UUID, song_id: UUID, db: Session = Depends(get_db)):
+@router.delete("/{playlist_id}/songs/{item_id}", response_model=schemas.PlaylistDetailRead)
+def remove_song(playlist_id: UUID, item_id: UUID, db: Session = Depends(get_db)):
+    """Remove one entry from a playlist, identified by the PlaylistSong row's
+    own id (not the Song's id) — this also works for unresolved import
+    entries, which have no song_id at all, and avoids ambiguity if the same
+    song appears twice in a playlist."""
     ps = (
         db.query(models.PlaylistSong)
         .filter(
             models.PlaylistSong.playlist_id == playlist_id,
-            models.PlaylistSong.song_id == song_id,
+            models.PlaylistSong.id == item_id,
         )
         .first()
     )
     if not ps:
-        raise HTTPException(404, "Song not in playlist")
+        raise HTTPException(404, "Entry not in playlist")
     db.delete(ps)
     db.commit()
     pl = _load_detail(playlist_id, db)
@@ -461,15 +465,15 @@ def remove_song(playlist_id: UUID, song_id: UUID, db: Session = Depends(get_db))
 @router.patch("/{playlist_id}/reorder", response_model=schemas.PlaylistDetailRead)
 def reorder_songs(playlist_id: UUID, data: schemas.ReorderRequest, db: Session = Depends(get_db)):
     _get_or_404(playlist_id, db)
-    position_map = {item.song_id: item.position for item in data.order}
+    position_map = {item.item_id: item.position for item in data.order}
 
     for ps in (
         db.query(models.PlaylistSong)
         .filter(models.PlaylistSong.playlist_id == playlist_id)
         .all()
     ):
-        if ps.song_id in position_map:
-            ps.position = position_map[ps.song_id]
+        if ps.id in position_map:
+            ps.position = position_map[ps.id]
 
     db.commit()
     pl = _load_detail(playlist_id, db)
