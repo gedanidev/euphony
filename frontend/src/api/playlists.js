@@ -27,3 +27,11 @@ export const importPlaylist = (file) => {
 export const importSpotifyPlaylist = (data) => {
   return api.post('/playlists/import-spotify', data).then(r => r.data)
 }
+
+export const importSpotifyCsv = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/playlists/import-spotify-csv', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then(r => r.data)
+}

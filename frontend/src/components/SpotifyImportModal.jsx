@@ -1,13 +1,16 @@
 import { useState, useCallback } from 'react'
-import { importSpotifyPlaylist } from '../api/playlists'
+import { importSpotifyPlaylist, importSpotifyCsv } from '../api/playlists'
 
 // Spotify blocks reading playlist track contents via its API for personal/
 // development-mode apps (same restriction category that killed artist
 // genres earlier) — confirmed with a 403 regardless of playlist ownership,
 // visibility, or query params. Until/unless Extended Quota Mode is granted
-// for this app, "paste a track list" is the only import path that works.
+// for this app, these two paths (paste text, or upload a CSV from a
+// third-party exporter like Exportify) are what actually work.
 export default function SpotifyImportModal({ onClose, onImported }) {
+  const [mode, setMode] = useState('paste') // 'paste' | 'csv'
   const [manualText, setManualText] = useState('')
+  const [csvFile, setCsvFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [result, setResult] = useState(null)
@@ -45,14 +48,20 @@ export default function SpotifyImportModal({ onClose, onImported }) {
     setResult(null)
 
     try {
-      const tracks = parseManualText(manualText)
-      if (!tracks.length) {
-        throw new Error('No tracks found')
+      let importResult
+      if (mode === 'csv') {
+        if (!csvFile) throw new Error('Choose a CSV file first')
+        importResult = await importSpotifyCsv(csvFile)
+      } else {
+        const tracks = parseManualText(manualText)
+        if (!tracks.length) {
+          throw new Error('No tracks found')
+        }
+        importResult = await importSpotifyPlaylist({
+          playlist_name: 'Imported Playlist',
+          tracks,
+        })
       }
-      const importResult = await importSpotifyPlaylist({
-        playlist_name: 'Imported Playlist',
-        tracks,
-      })
 
       setResult(importResult)
       if (onImported) onImported(importResult)
@@ -80,26 +89,64 @@ export default function SpotifyImportModal({ onClose, onImported }) {
           </button>
         </div>
 
+        {/* Mode tabs */}
+        {!result && (
+          <div className="flex gap-2 px-5 pt-4">
+            <button
+              onClick={() => setMode('csv')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                mode === 'csv' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'
+              }`}
+            >
+              Upload CSV
+            </button>
+            <button
+              onClick={() => setMode('paste')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                mode === 'paste' ? 'bg-purple-600 text-white' : 'bg-[#1e1e30] text-[#94a3b8] hover:text-white'
+              }`}
+            >
+              Paste List
+            </button>
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5">
           {!result ? (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
-                  Track List
-                </label>
-                <textarea
-                  autoFocus
-                  value={manualText}
-                  onChange={e => setManualText(e.target.value)}
-                  placeholder={`Artist - Song Title\nAnother Artist - Another Song\n...`}
-                  rows={12}
-                  className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500 resize-none"
-                />
-                <p className="text-xs text-[#94a3b8] mt-1">
-                  One track per line in "Artist - Title" format. Spotify doesn't let personal apps read a playlist's tracks directly, so paste them here instead.
-                </p>
-              </div>
+              {mode === 'csv' ? (
+                <div>
+                  <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
+                    Playlist CSV
+                  </label>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={e => setCsvFile(e.target.files?.[0] || null)}
+                    className="w-full text-sm text-[#e2e8f0] file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:text-sm file:font-medium hover:file:bg-purple-700 file:cursor-pointer cursor-pointer"
+                  />
+                  <p className="text-xs text-[#94a3b8] mt-2">
+                    Export a playlist from a tool like Exportify (Spotify doesn't let personal apps read playlist tracks directly), then upload the CSV here.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs text-[#94a3b8] mb-1 block uppercase tracking-wider">
+                    Track List
+                  </label>
+                  <textarea
+                    value={manualText}
+                    onChange={e => setManualText(e.target.value)}
+                    placeholder={`Artist - Song Title\nAnother Artist - Another Song\n...`}
+                    rows={12}
+                    className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500 resize-none"
+                  />
+                  <p className="text-xs text-[#94a3b8] mt-1">
+                    One track per line in "Artist - Title" format.
+                  </p>
+                </div>
+              )}
 
               {error && (
                 <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
@@ -159,10 +206,10 @@ export default function SpotifyImportModal({ onClose, onImported }) {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={loading || !manualText.trim()}
+                disabled={loading || (mode === 'csv' ? !csvFile : !manualText.trim())}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
               >
-                {loading ? 'Importing…' : 'Import Tracks'}
+                {loading ? 'Importing…' : 'Import'}
               </button>
             </>
           )}
