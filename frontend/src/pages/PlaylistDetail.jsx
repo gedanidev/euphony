@@ -63,7 +63,7 @@ function SortableRow({ item, index, onRemove }) {
         <>
           <td className="px-3 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
           <td className="px-3 py-2 text-[#94a3b8]">{song.artist_display}</td>
-          <td className="px-3 py-2 text-[#94a3b8]">{song.album || '—'}</td>
+          <td className="px-3 py-2 text-[#94a3b8]">{song.album?.title || '—'}</td>
           <td className="px-3 py-2 text-[#94a3b8]">{song.year || '—'}</td>
           <td className="px-3 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
         </>
@@ -175,7 +175,7 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
                       </td>
                       <td className="px-4 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
                       <td className="px-4 py-2 text-[#94a3b8]">{song.artist_display}</td>
-                      <td className="px-4 py-2 text-[#94a3b8]">{song.album || '—'}</td>
+                      <td className="px-4 py-2 text-[#94a3b8]">{song.album?.title || '—'}</td>
                       <td className="px-4 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
                     </tr>
                   )
