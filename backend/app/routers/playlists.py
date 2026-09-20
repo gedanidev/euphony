@@ -230,26 +230,17 @@ def _fetch_spotify_playlist(playlist_url: str, db: Session) -> tuple[str, list[s
     return playlist_name, tracks
 
 
-@router.post("/import-spotify", response_model=schemas.SpotifyPlaylistImportResult, status_code=201)
-def import_spotify_playlist(
-    data: schemas.SpotifyPlaylistImportRequest,
-    db: Session = Depends(get_db),
-):
-    """Import a playlist from Spotify by matching tracks against the local library.
-
-    Two modes:
-      - playlist_url set: fetch the playlist server-side via the app's own
-        connected Spotify account (see Settings).
-      - tracks set directly: manual paste-list mode, no Spotify account needed.
-    """
-    if data.playlist_url:
-        playlist_name, tracks = _fetch_spotify_playlist(data.playlist_url, db)
-    elif data.tracks is not None:
-        playlist_name, tracks = (data.playlist_name or "Imported Playlist"), data.tracks
-    else:
-        raise HTTPException(400, "Either playlist_url or tracks must be provided")
-
-    pl = models.Playlist(name=playlist_name, description=data.description or "")
+def _import_tracks_as_playlist(
+    playlist_name: str,
+    tracks: list[schemas.SpotifyImportTrack],
+    db: Session,
+    description: str = "",
+) -> schemas.SpotifyPlaylistImportResult:
+    """Match a flat track list against the local library and create a
+    playlist from it. Shared by the JSON endpoint (URL fetch / manual paste)
+    and the CSV upload endpoint (Exportify et al.) — same matching rules
+    either way, so results don't quietly diverge between import paths."""
+    pl = models.Playlist(name=playlist_name, description=description or "")
     db.add(pl)
     db.flush()
 
@@ -317,6 +308,83 @@ def import_spotify_playlist(
         unresolved=unresolved,
         unmatched_tracks=unmatched_tracks,
     )
+
+
+@router.post("/import-spotify", response_model=schemas.SpotifyPlaylistImportResult, status_code=201)
+def import_spotify_playlist(
+    data: schemas.SpotifyPlaylistImportRequest,
+    db: Session = Depends(get_db),
+):
+    """Import a playlist from Spotify by matching tracks against the local library.
+
+    Two modes:
+      - playlist_url set: fetch the playlist server-side via the app's own
+        connected Spotify account (see Settings).
+      - tracks set directly: manual paste-list mode, no Spotify account needed.
+    """
+    if data.playlist_url:
+        playlist_name, tracks = _fetch_spotify_playlist(data.playlist_url, db)
+    elif data.tracks is not None:
+        playlist_name, tracks = (data.playlist_name or "Imported Playlist"), data.tracks
+    else:
+        raise HTTPException(400, "Either playlist_url or tracks must be provided")
+
+    return _import_tracks_as_playlist(playlist_name, tracks, db, data.description or "")
+
+
+# Exportify (and similar Spotify-playlist-export tools) column names we
+# accept, in priority order per field — different forks/versions vary a bit.
+_CSV_COLUMN_ALIASES = {
+    "title": ["Track Name", "Name", "Title"],
+    "artist": ["Artist Name(s)", "Artist Name", "Artist"],
+    "album": ["Album Name", "Album"],
+    "uri": ["Track URI", "URI", "Spotify URI"],
+}
+
+
+def _csv_field(row: dict, kind: str) -> str:
+    for key in _CSV_COLUMN_ALIASES[kind]:
+        if key in row and row[key]:
+            return row[key]
+    return ""
+
+
+@router.post("/import-spotify-csv", response_model=schemas.SpotifyPlaylistImportResult, status_code=201)
+async def import_spotify_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Import a playlist from a CSV exported by a third-party tool (e.g.
+    Exportify) — a workaround for Spotify blocking direct playlist reads
+    for personal apps. Same matching rules as the other import paths."""
+    content_bytes = await file.read()
+    content = content_bytes.decode("utf-8-sig", errors="replace")  # -sig strips a BOM if present
+
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames or not any(
+        col in reader.fieldnames for aliases in _CSV_COLUMN_ALIASES.values() for col in aliases
+    ):
+        raise HTTPException(400, "This doesn't look like a playlist export CSV (no recognizable columns)")
+
+    tracks = []
+    for row in reader:
+        title = _csv_field(row, "title")
+        if not title:
+            continue
+        uri = _csv_field(row, "uri")
+        spotify_id = uri.rsplit(":", 1)[-1] if uri.startswith("spotify:track:") else None
+        tracks.append(schemas.SpotifyImportTrack(
+            title=title,
+            artist=_csv_field(row, "artist"),
+            album=_csv_field(row, "album") or None,
+            spotify_id=spotify_id,
+        ))
+
+    if not tracks:
+        raise HTTPException(400, "No tracks found in this file")
+
+    playlist_name = (file.filename or "Imported Playlist").rsplit(".", 1)[0]
+    return _import_tracks_as_playlist(playlist_name, tracks, db)
 
 
 @router.get("/{playlist_id}", response_model=schemas.PlaylistDetailRead)
