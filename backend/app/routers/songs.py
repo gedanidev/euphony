@@ -415,6 +415,7 @@ def create_wishlist_item(body: schemas.WishlistCreate, db: Session = Depends(get
     song = models.Song(
         title=body.title,
         album_id=album.id if album else None,
+        availability="wishlist",
         walkman_status="wishlist",
         wishlist_notes=body.wishlist_notes,
     )
