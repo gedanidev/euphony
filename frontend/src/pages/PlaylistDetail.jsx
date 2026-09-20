@@ -36,7 +36,7 @@ function fmt(seconds) {
 
 function SortableRow({ item, index, onRemove }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.song.id })
+    useSortable({ id: item.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -44,8 +44,10 @@ function SortableRow({ item, index, onRemove }) {
     opacity: isDragging ? 0.4 : 1,
   }
 
+  const song = item.song
+
   return (
-    <tr ref={setNodeRef} style={style} className="border-b border-[#2e2e4a] hover:bg-[#22223a]/40 group text-sm">
+    <tr ref={setNodeRef} style={style} className={`border-b border-[#2e2e4a] hover:bg-[#22223a]/40 group text-sm ${!song ? 'opacity-50' : ''}`}>
       <td className="px-3 py-2 w-8">
         <button
           {...attributes} {...listeners}
@@ -57,14 +59,28 @@ function SortableRow({ item, index, onRemove }) {
         </button>
       </td>
       <td className="px-3 py-2 w-10 text-[#94a3b8] tabular-nums">{index + 1}</td>
-      <td className="px-3 py-2 font-medium text-[#e2e8f0]">{item.song.title}</td>
-      <td className="px-3 py-2 text-[#94a3b8]">{item.song.artist_display}</td>
-      <td className="px-3 py-2 text-[#94a3b8]">{item.song.album || '—'}</td>
-      <td className="px-3 py-2 text-[#94a3b8]">{item.song.year || '—'}</td>
-      <td className="px-3 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(item.song.duration)}</td>
+      {song ? (
+        <>
+          <td className="px-3 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
+          <td className="px-3 py-2 text-[#94a3b8]">{song.artist_display}</td>
+          <td className="px-3 py-2 text-[#94a3b8]">{song.album || '—'}</td>
+          <td className="px-3 py-2 text-[#94a3b8]">{song.year || '—'}</td>
+          <td className="px-3 py-2 text-[#94a3b8] text-right tabular-nums">{fmt(song.duration)}</td>
+        </>
+      ) : (
+        <>
+          <td className="px-3 py-2 font-medium text-[#e2e8f0] italic">{item.raw_title || '(sin título)'}</td>
+          <td className="px-3 py-2 text-[#94a3b8] italic">{item.raw_artist || '—'}</td>
+          <td className="px-3 py-2 text-[#94a3b8]" colSpan={3}>
+            <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+              No encontrada en tu librería
+            </span>
+          </td>
+        </>
+      )}
       <td className="px-3 py-2 w-8">
         <button
-          onClick={() => onRemove(item.song.id)}
+          onClick={() => onRemove(item.id)}
           className="text-red-400/40 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -211,7 +227,7 @@ export default function PlaylistDetail() {
       setLoading(true); setError(null)
       const data = await getPlaylist(id)
       setPlaylist(data)
-      setItems(data.songs)
+      setItems(data.playlist_songs)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -223,19 +239,19 @@ export default function PlaylistDetail() {
 
   const handleDragEnd = async ({ active, over }) => {
     if (!over || active.id === over.id) return
-    const oldIdx = items.findIndex(i => i.song.id === active.id)
-    const newIdx = items.findIndex(i => i.song.id === over.id)
+    const oldIdx = items.findIndex(i => i.id === active.id)
+    const newIdx = items.findIndex(i => i.id === over.id)
     const next   = arrayMove(items, oldIdx, newIdx).map((item, idx) => ({ ...item, position: idx }))
     setItems(next)
     try {
-      await reorderPlaylist(id, next.map(i => ({ song_id: i.song.id, position: i.position })))
+      await reorderPlaylist(id, next.map(i => ({ item_id: i.id, position: i.position })))
     } catch { load() }
   }
 
-  const handleRemove = async (songId) => {
+  const handleRemove = async (itemId) => {
     try {
-      const data = await removeSongFromPlaylist(id, songId)
-      setItems(data.songs)
+      const data = await removeSongFromPlaylist(id, itemId)
+      setItems(data.playlist_songs)
     } catch { alert('Error eliminando canción') }
   }
 
@@ -266,7 +282,7 @@ export default function PlaylistDetail() {
   if (loading) return <div className="p-6"><LoadingSpinner /></div>
   if (error)   return <div className="p-6"><ErrorState message={error} onRetry={load} /></div>
 
-  const existingIds = new Set(items.map(i => i.song.id))
+  const existingIds = new Set(items.map(i => i.song?.id).filter(Boolean))
 
   return (
     <div className="p-6">
@@ -371,10 +387,10 @@ export default function PlaylistDetail() {
                   <th className="px-3 py-3 w-8" />
                 </tr>
               </thead>
-              <SortableContext items={items.map(i => i.song.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
                 <tbody>
                   {items.map((item, idx) => (
-                    <SortableRow key={item.song.id} item={item} index={idx} onRemove={handleRemove} />
+                    <SortableRow key={item.id} item={item} index={idx} onRemove={handleRemove} />
                   ))}
                 </tbody>
               </SortableContext>
