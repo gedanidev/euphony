@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from difflib import SequenceMatcher
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
@@ -230,6 +231,84 @@ def _fetch_spotify_playlist(playlist_url: str, db: Session) -> tuple[str, list[s
     return playlist_name, tracks
 
 
+# ---------------------------------------------------------------------------
+# Fuzzy title/artist matching for playlist import
+#
+# Exact/substring matching breaks on things that are extremely common
+# between an export tool's metadata and a personal library's tags: a
+# "- Remastered 2017" suffix Spotify adds that the local file doesn't have,
+# a curly apostrophe in one source and a straight one in the other, a
+# leading "A"/"The" present in one title but not the other. Normalize both
+# sides the same way and compare by similarity instead of literal
+# containment — same approach already proven for genre matching.
+# ---------------------------------------------------------------------------
+
+_VERSION_SUFFIX_RE = re.compile(
+    r"\s*[-(\[]\s*(remaster(ed)?|remix|live|radio edit|mono|stereo|deluxe|"
+    r"bonus|explicit|clean|single|album version|extended|acoustic)\b.*$",
+    re.IGNORECASE,
+)
+_LEADING_ARTICLE_RE = re.compile(r"^(the|an?)\s+", re.IGNORECASE)
+_CURLY_APOSTROPHE_RE = re.compile(r"[‘’ʼ]")
+_CURLY_QUOTE_RE = re.compile(r"[“”]")
+
+MIN_ARTIST_MATCH_SCORE = 0.72
+MIN_TITLE_MATCH_SCORE = 0.72
+
+
+def _normalize_for_match(s: str) -> str:
+    s = _CURLY_APOSTROPHE_RE.sub("'", s)
+    s = _CURLY_QUOTE_RE.sub('"', s)
+    s = s.lower().strip()
+    s = _VERSION_SUFFIX_RE.sub("", s)
+    s = _LEADING_ARTICLE_RE.sub("", s)
+    s = re.sub(r"[^a-z0-9]+", " ", s).strip()
+    return s
+
+
+def _text_similarity(a: str, b: str) -> float:
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _find_song_by_similarity(db: Session, title: str, artist_name: str) -> Optional[models.Song]:
+    """Fallback when exact matching fails: find the closest artist by name
+    similarity, then the closest song title among just that artist's songs.
+    Scoped to one artist's songs (not a full-library scan) both for
+    performance and to avoid a title matching some other artist's song."""
+    if not title or not artist_name:
+        return None
+
+    norm_artist = _normalize_for_match(artist_name)
+    if not norm_artist:
+        return None
+
+    best_artist_id, best_artist_score = None, 0.0
+    for aid, aname in db.query(models.Artist.id, models.Artist.name).all():
+        score = _text_similarity(norm_artist, _normalize_for_match(aname))
+        if score > best_artist_score:
+            best_artist_id, best_artist_score = aid, score
+
+    if not best_artist_id or best_artist_score < MIN_ARTIST_MATCH_SCORE:
+        return None
+
+    norm_title = _normalize_for_match(title)
+    best_song, best_score = None, 0.0
+    candidates = (
+        db.query(models.Song)
+        .join(models.SongArtist, models.SongArtist.song_id == models.Song.id)
+        .filter(models.SongArtist.artist_id == best_artist_id)
+        .all()
+    )
+    for song in candidates:
+        score = _text_similarity(norm_title, _normalize_for_match(song.title))
+        if score > best_score:
+            best_song, best_score = song, score
+
+    if best_song and best_score >= MIN_TITLE_MATCH_SCORE:
+        return best_song
+    return None
+
+
 def _import_tracks_as_playlist(
     playlist_name: str,
     tracks: list[schemas.SpotifyImportTrack],
@@ -270,18 +349,11 @@ def _import_tracks_as_playlist(
                 .first()
             )
 
-        # 3. Fuzzy match: title contains search text AND artist contains search text
+        # 3. Fuzzy match: normalize (remaster suffixes, curly quotes, leading
+        # articles) and compare by similarity, scoped to the closest-matching
+        # artist rather than a full-library scan.
         if not song and track.title and track.artist:
-            song = (
-                db.query(models.Song)
-                .join(models.SongArtist, models.SongArtist.song_id == models.Song.id, isouter=True)
-                .join(models.Artist, models.Artist.id == models.SongArtist.artist_id, isouter=True)
-                .filter(
-                    models.Song.title.ilike(f"%{track.title}%"),
-                    models.Artist.name.ilike(f"%{track.artist}%"),
-                )
-                .first()
-            )
+            song = _find_song_by_similarity(db, track.title, track.artist)
 
         ps = models.PlaylistSong(
             playlist_id=pl.id,
@@ -457,6 +529,31 @@ def remove_song(playlist_id: UUID, item_id: UUID, db: Session = Depends(get_db))
     if not ps:
         raise HTTPException(404, "Entry not in playlist")
     db.delete(ps)
+    db.commit()
+    pl = _load_detail(playlist_id, db)
+    return _to_detail(pl)
+
+
+@router.patch("/{playlist_id}/songs/{item_id}/resolve", response_model=schemas.PlaylistDetailRead)
+def resolve_song(playlist_id: UUID, item_id: UUID, data: schemas.ResolveEntryRequest, db: Session = Depends(get_db)):
+    """Manually link an unresolved import entry (or replace an existing
+    match) to a real song — for the cases automatic matching can't
+    reasonably bridge (very different title/artist spelling, a cover
+    version, etc.)."""
+    ps = (
+        db.query(models.PlaylistSong)
+        .filter(
+            models.PlaylistSong.playlist_id == playlist_id,
+            models.PlaylistSong.id == item_id,
+        )
+        .first()
+    )
+    if not ps:
+        raise HTTPException(404, "Entry not in playlist")
+    if not db.query(models.Song.id).filter(models.Song.id == data.song_id).first():
+        raise HTTPException(404, "Song not found")
+
+    ps.song_id = data.song_id
     db.commit()
     pl = _load_detail(playlist_id, db)
     return _to_detail(pl)

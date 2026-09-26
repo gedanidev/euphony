@@ -92,6 +92,9 @@
   "playlistDetail.descriptionPlaceholder": "Descripción",
   "playlistDetail.emptyTitle": "Sin canciones",
   "playlistDetail.emptyDesc": "Agrega canciones desde tu biblioteca",
+  "playlistDetail.notFound": "No encontrada en tu librería",
+  "playlistDetail.linkToSong": "Vincular a una canción",
+  "playlistDetail.resolveTitle": "Vincular a una canción",
 
   "import.title": "Importar Playlist",
   "import.desc": "Sube un archivo M3U/M3U8 para importar canciones a tu biblioteca. Se crearán automáticamente artistas y canciones nuevas. Las existentes quedarán vinculadas.",

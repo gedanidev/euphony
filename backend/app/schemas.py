@@ -274,6 +274,9 @@ class ReorderItem(BaseModel):
 class ReorderRequest(BaseModel):
     order: List[ReorderItem]
 
+class ResolveEntryRequest(BaseModel):
+    song_id: UUID
+
 
 # ---------------------------------------------------------------------------
 # Import

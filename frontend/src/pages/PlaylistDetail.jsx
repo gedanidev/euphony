@@ -20,7 +20,7 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   getPlaylist, updatePlaylist, deletePlaylist,
   removeSongFromPlaylist, addSongsToPlaylist,
-  reorderPlaylist, exportPlaylist,
+  reorderPlaylist, exportPlaylist, resolvePlaylistSong,
 } from '../api/playlists'
 import { getSongs } from '../api/songs'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -34,7 +34,8 @@ function fmt(seconds) {
 
 // ── Sortable row ─────────────────────────────────────────────────────────────
 
-function SortableRow({ item, index, onRemove }) {
+function SortableRow({ item, index, onRemove, onResolve }) {
+  const { t } = useTranslation()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id })
 
@@ -72,9 +73,15 @@ function SortableRow({ item, index, onRemove }) {
           <td className="px-3 py-2 font-medium text-[#e2e8f0] italic">{item.raw_title || '(sin título)'}</td>
           <td className="px-3 py-2 text-[#94a3b8] italic">{item.raw_artist || '—'}</td>
           <td className="px-3 py-2 text-[#94a3b8]" colSpan={3}>
-            <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-              No encontrada en tu librería
+            <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 mr-2">
+              {t('playlistDetail.notFound') || 'No encontrada en tu librería'}
             </span>
+            <button
+              onClick={() => onResolve(item)}
+              className="text-xs text-purple-400 hover:text-purple-300 underline"
+            >
+              {t('playlistDetail.linkToSong') || 'Vincular a una canción'}
+            </button>
           </td>
         </>
       )}
@@ -202,6 +209,83 @@ function AddSongsModal({ playlistId, existingIds, onClose, onAdded }) {
   )
 }
 
+// ── Resolve modal (link an unresolved entry to a real song) ─────────────────
+
+function ResolveModal({ item, onClose, onResolved }) {
+  const { t } = useTranslation()
+  const [songs, setSongs] = useState([])
+  const [search, setSearch] = useState(item.raw_title || '')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getSongs({ search, limit: 50 }).then(data => {
+      if (!cancelled) { setSongs(data.items); setLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [search])
+
+  const handlePick = async (songId) => {
+    setSaving(true)
+    try {
+      await onResolved(songId)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-[#1a1a24] border border-[#2e2e4a] rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-[#2e2e4a] flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">{t('playlistDetail.resolveTitle') || 'Vincular a una canción'}</h2>
+            <p className="text-xs text-[#94a3b8] mt-0.5">{item.raw_artist} — {item.raw_title}</p>
+          </div>
+          <button onClick={onClose} className="text-[#94a3b8] hover:text-white">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 border-b border-[#2e2e4a]">
+          <input
+            autoFocus
+            type="text"
+            placeholder={t('playlistDetail.searchSongs') || 'Buscar canciones…'}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full px-3 py-2 bg-[#0f0f13] border border-[#2e2e4a] rounded-lg text-sm text-[#e2e8f0] placeholder-[#94a3b8] focus:outline-none focus:border-purple-500"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? <LoadingSpinner /> : songs.length === 0 ? (
+            <div className="py-12 text-center text-[#94a3b8] text-sm">{t('playlistDetail.noSongsFound') || 'No se encontraron canciones'}</div>
+          ) : (
+            <table className="w-full">
+              <tbody>
+                {songs.map(song => (
+                  <tr
+                    key={song.id}
+                    onClick={() => !saving && handlePick(song.id)}
+                    className="cursor-pointer hover:bg-[#22223a]/60 border-b border-[#2e2e4a] last:border-0"
+                  >
+                    <td className="px-4 py-2 font-medium text-[#e2e8f0]">{song.title}</td>
+                    <td className="px-4 py-2 text-[#94a3b8]">{song.artist_display}</td>
+                    <td className="px-4 py-2 text-[#94a3b8]">{song.album?.title || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function PlaylistDetail() {
@@ -214,6 +298,7 @@ export default function PlaylistDetail() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
   const [showAdd, setShowAdd]     = useState(false)
+  const [resolvingItem, setResolvingItem] = useState(null)
   const [editing, setEditing]     = useState(false)
   const [editForm, setEditForm]   = useState({ name: '', description: '' })
 
@@ -253,6 +338,14 @@ export default function PlaylistDetail() {
       const data = await removeSongFromPlaylist(id, itemId)
       setItems(data.playlist_songs)
     } catch { alert('Error eliminando canción') }
+  }
+
+  const handleResolve = async (songId) => {
+    try {
+      const data = await resolvePlaylistSong(id, resolvingItem.id, songId)
+      setItems(data.playlist_songs)
+      setResolvingItem(null)
+    } catch { alert('Error vinculando canción') }
   }
 
   const handleSaveEdit = async () => {
@@ -390,7 +483,7 @@ export default function PlaylistDetail() {
               <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
                 <tbody>
                   {items.map((item, idx) => (
-                    <SortableRow key={item.id} item={item} index={idx} onRemove={handleRemove} />
+                    <SortableRow key={item.id} item={item} index={idx} onRemove={handleRemove} onResolve={setResolvingItem} />
                   ))}
                 </tbody>
               </SortableContext>
@@ -405,6 +498,14 @@ export default function PlaylistDetail() {
           existingIds={existingIds}
           onClose={() => setShowAdd(false)}
           onAdded={() => { setShowAdd(false); load() }}
+        />
+      )}
+
+      {resolvingItem && (
+        <ResolveModal
+          item={resolvingItem}
+          onClose={() => setResolvingItem(null)}
+          onResolved={handleResolve}
         />
       )}
     </div>

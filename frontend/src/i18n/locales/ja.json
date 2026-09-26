@@ -92,6 +92,9 @@
   "playlistDetail.descriptionPlaceholder": "説明",
   "playlistDetail.emptyTitle": "曲がありません",
   "playlistDetail.emptyDesc": "ライブラリから曲を追加してください",
+  "playlistDetail.notFound": "ライブラリに見つかりません",
+  "playlistDetail.linkToSong": "曲にリンク",
+  "playlistDetail.resolveTitle": "曲にリンク",
 
   "import.title": "プレイリストをインポート",
   "import.desc": "M3U/M3U8ファイルをアップロードして曲をライブラリに追加します。新しいアーティストと曲は自動的に作成されます。",
