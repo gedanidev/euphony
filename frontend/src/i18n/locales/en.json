@@ -92,6 +92,9 @@
   "playlistDetail.descriptionPlaceholder": "Description",
   "playlistDetail.emptyTitle": "No songs yet",
   "playlistDetail.emptyDesc": "Add songs from your library",
+  "playlistDetail.notFound": "Not found in your library",
+  "playlistDetail.linkToSong": "Link to a song",
+  "playlistDetail.resolveTitle": "Link to a song",
 
   "import.title": "Import Playlist",
   "import.desc": "Upload an M3U/M3U8 file to import songs into your library. New artists and songs will be created automatically. Existing ones will be linked.",

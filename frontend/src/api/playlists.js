@@ -8,6 +8,7 @@ export const deletePlaylist       = (id)               => api.delete(`/playlists
 export const addSongsToPlaylist   = (id, song_ids)     => api.post(`/playlists/${id}/songs`, { song_ids }).then(r => r.data)
 export const removeSongFromPlaylist = (id, song_id)    => api.delete(`/playlists/${id}/songs/${song_id}`).then(r => r.data)
 export const reorderPlaylist      = (id, order)        => api.patch(`/playlists/${id}/reorder`, { order }).then(r => r.data)
+export const resolvePlaylistSong  = (id, itemId, songId) => api.patch(`/playlists/${id}/songs/${itemId}/resolve`, { song_id: songId }).then(r => r.data)
 
 export const exportPlaylist = (id, format, relative, basePath) => {
   const params = { format }
